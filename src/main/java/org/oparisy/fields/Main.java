@@ -98,7 +98,7 @@ public class Main {
 	private static final int SCREEN_WIDTH = 1024;
 
 	// Resources (shader sources) location
-	private static final String RES = Main.class.getPackage().getName().replace(".", "/");
+	private static final String RES = "fields"; //Main.class.getPackage().getName().replace(".", "/");
 
 	private static final String vertexShaderFile = RES + "/" + "StandardShading.vertexshader";
 	private static final String fragmentShaderFile = RES + "/" + "StandardShading.fragmentshader";
