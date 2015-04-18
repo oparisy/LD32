@@ -1,0 +1,105 @@
+// Top level tasks: run, myCapsule, launch4j
+
+buildscript {
+	repositories {mavenCentral() }
+	dependencies { classpath 'edu.sc.seis.gradle:launch4j:1.0.6' }
+}
+
+plugins {
+	id 'com.stehno.natives' version '0.2.1'
+	id 'us.kirchmeier.capsule' version '0.10.0'
+}
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'application'
+apply plugin: 'launch4j'
+
+repositories {
+	mavenCentral()
+	// Required to get snashot version of Capsule
+	maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
+}
+
+// Configure your application with the following properties
+def mainClass = 'org.oparisy.fields.Main'
+def javaLevel = 1.6
+def appArgs = '' // '-fullscreen'
+
+// Set this to true to debug startup problems when using capsule + launch4j
+def debugStartup = false
+
+dependencies {
+	compile 'org.lwjgl.lwjgl:lwjgl:2.9.2'
+	compile 'org.lwjgl.lwjgl:lwjgl_util:2.9.2'
+	compile 'org.apache.commons:commons-lang3:3.1'
+	compile 'commons-io:commons-io:2.4'
+	compile 'org.jbox2d:jbox2d-library:2.1.2.2'
+}
+
+sourceCompatibility = targetCompatibility = javaLevel
+
+natives {
+	// Find native jars by name in dependencies
+	jars = configurations.compile.files.collect{it.name}.findAll{it==~/.*-natives-.*/}
+}
+
+// Unpacked native libraries folders
+def nativePaths = ['windows', 'linux', 'osx'].collect{'build/natives/' + it}
+
+run {
+	mainClassName = mainClass
+	systemProperty 'java.library.path', files(nativePaths).asPath
+	if (appArgs?.trim()) {
+		args appArgs
+	}
+}
+
+// With this, "gradle clean run" will work
+tasks.run.dependsOn(unpackNatives)
+
+// Solve Capsule issue #46
+configurations { myCapsule }
+dependencies { myCapsule 'co.paralleluniverse:capsule:0.10.1-SNAPSHOT' }
+
+def minimumJavaVersion = javaLevel + '.0'
+
+task myCapsule(type: FatCapsule, dependsOn: [jar, unpackNatives]) {
+	capsuleConfiguration = configurations.myCapsule
+
+	// Application jar is embedded through applicationSource default value
+	applicationClass mainClassName
+
+	// Embed application dependencies
+	embedConfiguration = configurations.runtime { exclude '*-natives-*'}
+
+	// Copy native libraries to capsule root
+	from (nativePaths)
+
+	capsuleManifest {
+		minJavaVersion = minimumJavaVersion
+		jvmArgs = run.jvmArgs
+
+		// Append appArgs to arguments, if not null or blank
+		if (appArgs?.trim()) {
+			args << appArgs
+		}
+
+		if (debugStartup) {
+			systemProperties['capsule.log'] = 'verbose'
+		}
+	}
+}
+
+launch4j {
+	mainClassName = 'Capsule'
+	jar = tasks.myCapsule.outputs.files.singleFile
+	jreMinVersion = minimumJavaVersion
+	outfile = project.name + '.exe'
+	if (debugStartup) {
+		headerType = 'console'
+	}
+}
+
+// Ensure that executable is created last (adding a launch4j => myCapsule dependency does not suffice)
+tasks.createExe.dependsOn(tasks.myCapsule)
