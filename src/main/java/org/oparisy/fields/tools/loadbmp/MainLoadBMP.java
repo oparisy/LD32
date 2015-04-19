@@ -17,6 +17,7 @@ import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
 import org.lwjgl.opengl.PixelFormat;
 import org.lwjgl.opengl.Util;
+import org.oparisy.fields.tools.common.MessageHandler;
 import org.oparisy.fields.tools.common.Tools;
 
 /**

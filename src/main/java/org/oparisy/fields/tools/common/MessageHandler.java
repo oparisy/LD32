@@ -1,4 +1,4 @@
-package org.oparisy.fields.tools.loadbmp;
+package org.oparisy.fields.tools.common;
 
 import static org.lwjgl.opengl.ARBDebugOutput.*;
 
