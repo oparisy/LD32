@@ -22,7 +22,7 @@ import org.lwjgl.opengl.DisplayMode;
 import org.lwjgl.opengl.PixelFormat;
 import org.lwjgl.opengl.Util;
 import org.lwjgl.util.vector.Matrix4f;
-
+import org.lwjgl.util.vector.Vector2f;
 import org.oparisy.fields.tools.common.MessageHandler;
 import org.oparisy.fields.tools.common.Tools;
 
@@ -37,16 +37,19 @@ public class TextDrawSample {
 	private static final String vertexShaderFile = RES + "/" + "render.vs";
 	private static final String fragmentShaderFile = RES + "/" + "render.fs";
 
-	private static final int FONT_WIDTH = 256;
+	private static final int FONT_WIDTH = 5;
 	private static final int FONT_HEIGHT = 5;
+	private static final int CHAR_HORIZONTAL_MARGIN = 1;
 
-	// A triangle centered on the origin
-	private static final float triangle_vertex[] = {
+	private static final int SCALE = 2;
+
+	// A quad
+	private static final float quad_vertex[] = {
 			//
-			FONT_WIDTH*2, 0,//
+			FONT_WIDTH * SCALE, 0,//
 			0, 0,//
-			FONT_WIDTH*2, FONT_HEIGHT*2,//
-			0, FONT_HEIGHT*2 };
+			FONT_WIDTH * SCALE, FONT_HEIGHT * SCALE,//
+			0, FONT_HEIGHT * SCALE };
 
 	// Will be scaled in fragment shader
 	private static final float uv_data[] = {
@@ -68,6 +71,8 @@ public class TextDrawSample {
 	private int pvmID;
 	private int font;
 	private int samplerID;
+	private int asciiID;
+	private int charPosID;
 
 	private void setup() throws LWJGLException, Exception, Error {
 		DisplayMode mode = new DisplayMode(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -96,7 +101,9 @@ public class TextDrawSample {
 		uvID = Tools.glGetAttribLocationChecked(program, "vertexUV");
 
 		pvmID = Tools.glGetUniformLocationChecked(program, "PVM");
+		charPosID = Tools.glGetUniformLocationChecked(program, "charPos");
 		samplerID = Tools.glGetUniformLocationChecked(program, "myTextureSampler");
+		asciiID = Tools.glGetUniformLocationChecked(program, "ascii");
 
 		// Create a VAO to store buffers configuration
 		glBindVertexArray(glGenVertexArrays());
@@ -104,9 +111,9 @@ public class TextDrawSample {
 		// Vertices for one triangle
 		vertexBuffer = glGenBuffers();
 		glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-		glBufferData(GL_ARRAY_BUFFER, Tools.buildFloatBuffer(triangle_vertex), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, Tools.buildFloatBuffer(quad_vertex), GL_STATIC_DRAW);
 		glVertexAttribPointer(posID, 2, GL_FLOAT, false, 0, 0);
-		
+
 		uvBuffer = glGenBuffers();
 		glBindBuffer(GL_ARRAY_BUFFER, uvBuffer);
 		glBufferData(GL_ARRAY_BUFFER, Tools.buildFloatBuffer(uv_data), GL_STATIC_DRAW);
@@ -137,13 +144,21 @@ public class TextDrawSample {
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, font);
 		glUniform1i(samplerID, 0);
-		
+
 		// TODO Put those in setup?
 		glEnableVertexAttribArray(posID);
 		glEnableVertexAttribArray(uvID);
 
 		// Draw
-		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		int x = 0, y = 0;
+		for (int chr : "Hello World".toUpperCase().toCharArray()) {
+			if (chr != 32) {
+				glUniform1i(asciiID, chr);
+				glUniformMatrix4(charPosID, false, Tools.buildFloatBuffer(new Matrix4f().translate(new Vector2f(x, y))));
+				glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+			}
+			x += (FONT_WIDTH + CHAR_HORIZONTAL_MARGIN) * SCALE;
+		}
 
 		// TODO Are those needed here?
 		// glDisableVertexAttribArray(posID);
@@ -160,7 +175,7 @@ public class TextDrawSample {
 
 		Display.destroy();
 	}
-	
+
 	public static int uploadTexture(BufferedImage img) {
 		img = Tools.flipVertically(img);
 		ByteBuffer pixels = Tools.imageToByteBuffer(img);
