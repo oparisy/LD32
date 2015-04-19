@@ -63,4 +63,8 @@ public class PhysicalState {
 	public GameEntity getEntity() {
 		return entity;
 	}
+	
+	public Vec2 getLinarVelocity() {
+		return body.getLinearVelocity();
+	}
 }

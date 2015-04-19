@@ -55,6 +55,7 @@ Objectifs demanche :
  * Poster une update
  * Jalon 4 : remodéliser placeholders
  * Jalon 5 : écran titre
- * Jalon 6 : sons
+ * Jalon 6 : sons [fait]
  * Jalon 6 : tuning gameplay
  * Jalon 7 : tuning rendu
+ * Jalon 8 : musique

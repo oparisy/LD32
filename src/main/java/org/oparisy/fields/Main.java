@@ -119,6 +119,8 @@ public class Main {
 
 	private int gameOver;
 
+	private int highOuch;
+
 	private int ouch;
 
 	private int weeUup;
@@ -168,6 +170,7 @@ public class Main {
 		collision = soundManager.addSound("fields/collision.wav");
 		enemyKill = soundManager.addSound("fields/enemyKill.wav");
 		gameOver = soundManager.addSound("fields/gameOver.wav");
+		highOuch = soundManager.addSound("fields/highOuch.wav");
 		ouch = soundManager.addSound("fields/ouch.wav");
 		weeUup = soundManager.addSound("fields/weeUup.wav");
 	}
@@ -377,13 +380,51 @@ public class Main {
 	}
 
 	private void runIA() {
-		// Move enemies according to player position
+		// Compute a force to "steer" enemy to player
 		for (Enemy enemy : enemies) {
+
+			// System.out.println("Player position: " + player.getState().getPosition());
+			// System.out.println("Enemy position: " + enemy.getState().getPosition());
+
 			Vec2 dir = player.getState().getPosition().sub(enemy.getState().getPosition());
 			dir.normalize();
-			dir = dir.mul(0.005f); // Enemy speed
-			enemy.getState().addToPos(dir);
+
+			// System.out.println("Enemy => player direction: " + dir);
+
+			Vec2 f;
+
+			Vec2 enemyDir = enemy.getState().getLinarVelocity();
+			if (enemyDir.length() < 1e-2) {
+				// Enemy is too slow; just apply a force to player
+				f = dir.mul(0.005f);
+			} else {
+				// Take enemy speed into account
+
+				enemyDir.normalize();
+
+				// System.out.println("Enemy direction: " + enemyDir);
+
+				// Will go from 2 (opposed direction) to 0 (same direction)
+				float error = 1 - Vec2.dot(dir, enemyDir);
+
+				// System.out.println("error: " + error);
+
+				f = dir.mul(error * -0.005f);
+			}
+
+			// System.out.println("Applied force: " + f);
+			enemy.getState().applyForce(dir, enemy.getState().getPosition());
 		}
+
+		/*
+		 * // Move enemies according to player position
+		 * for (Enemy enemy : enemies) {
+		 * Vec2 dir = player.getState().getPosition().sub(enemy.getState().getPosition());
+		 * dir.normalize();
+		 * dir = dir.mul(0.005f); // Enemy speed
+		 * enemy.getState().addToPos(dir);
+		 * }
+		 */
 	}
 
 	private void updateEnemyMatrix() {
@@ -556,7 +597,7 @@ public class Main {
 		GameEntity e1 = obj1.getEntity();
 		GameEntity e2 = obj2.getEntity();
 
-		// Order entities to limit combinations to: Box/Box, Box/Enemy, Box/Player, Box/Wall, Enemy/Wall, Player/Wall
+		// Order entities to limit combinations to: Box/Box, Box/Enemy, Box/Player, Box/Wall, Enemy/Player, Enemy/Wall, Player/Wall
 		// Enemy/Player are not detected here (since both are static bodies)
 		if (e1.getClass().getName().compareTo(e2.getClass().getName()) > 0) {
 			GameEntity tmp = e1;
@@ -564,7 +605,7 @@ public class Main {
 			e2 = tmp;
 		}
 
-		if ((e1 instanceof Player || e1 instanceof Wall) && e2 instanceof Wall) {
+		if ((e1 instanceof Player || e1 instanceof Enemy) && e2 instanceof Wall) {
 			// No gameplay effect, no sound
 			return;
 		}
@@ -582,9 +623,17 @@ public class Main {
 			impStr.add(Float.toString(impulse.normalImpulses[i]));
 		}
 
-		System.out.println("Contact between " + e1.getName() + " and " + e2.getName() + "; normal impulse is ["
-				+ StringUtils.join(impStr, ", ") + "]");
-		
+		// System.out.println("Contact between " + e1.getName() + " and " + e2.getName() + "; normal impulse is ["
+		// + StringUtils.join(impStr, ", ") + "]");
+
+		if (e1 instanceof Enemy && e2 instanceof Player) {
+			// Player was hit by enemy! High damage for player
+			if (!collisionStore.recentlyCollided(e1, e2)) {
+				soundManager.playEffect(this.highOuch);
+			}
+			return;
+		}
+
 		if (e2 instanceof Enemy) {
 			// Enemy is hit by a box! High damage
 			if (!collisionStore.recentlyCollided(e1, e2)) {
@@ -592,7 +641,7 @@ public class Main {
 			}
 			return;
 		}
-		
+
 		if (e2 instanceof Player) {
 			// Player is hit by a box! Low damage
 			if (!collisionStore.recentlyCollided(e1, e2)) {

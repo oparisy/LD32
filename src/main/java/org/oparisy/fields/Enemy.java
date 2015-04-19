@@ -10,6 +10,6 @@ public class Enemy extends GameEntity {
 		super(name);
 		CircleShape cs = new CircleShape();
 		cs.m_radius = 1f;
-		setPhysicalState(new PhysicalState(x, y, world, BodyType.STATIC, cs, this));
+		setPhysicalState(new PhysicalState(x, y, world, BodyType.DYNAMIC, cs, this));
 	}
 }
