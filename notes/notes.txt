@@ -1,0 +1,51 @@
+Jeu : "Fields"
+Concept :
+pas d'intraction directe avec les ennemis (hors collisions) ou l'environnement :
+utilisation de forces (attractives ou répulsives) pour "tendre des pièges" (ennemis perdent des PV suivant force collision)
+
+Choix de libs :
+ * rendu : lwjgl 2 (je ne connais pas assez bien la v3 / ne sait pas la packager)
+ * simulation : ode4j 0.3.0 (pour avoir une simulation 3D et permettre projections en l'air et empilements
+ 
+ ode4j :
+ * maven : https://github.com/tzaeschke/ode4j/wiki/Maven-HOWTO
+ * doc complète : http://ode-wiki.org/wiki/index.php?title=Manual:_All&printable=yes
+ * Pas réussi à récupérer la 0.3.0 depuis maven => installé la 0.2.7 et fait un gradle > Refresh all
+ 
+lwjgl :
+ * globalement la config gradle est OK mais ajout de build/native/windows à Configure Build Path > Libraries > Native Library Location
+   afin de pouvoir lancer des snippets via leur "main"
+
+Java : v1.6 pour compatibilité maximale (suffit pour ode4j et lwjgl2)
+
+Rendu :
+Vue type "top down" avec léger effet de perspective (léger déplacement caméra suivant mouvements)
+
+Level design :
+arena shooter dans un premier temps
+
+Jalon 1 :
+coder une "balle physique" sur un plan, vue de dessus, déplaçeable par flèches (application de forces ?)
+=> besoins : setup simulation, boucle rendu + simulation basique, chargement de mesh, modification matrice du mesh suivant simulation
+
+Jalon 2 :
+Ajouter un empilement de cubes, pouvoir le faire tomber par percussion
+=> besoins : passer matrice de position pour pouvoir la changer dans une boucle "par entité" (plus simple que de l'instanciation) [fait],
+   collisions [fait, mais le joueur ne fait pas bouger ?), chargement monde plus complexe (fichier de description de "niveau" ?)
+
+Jalon 3 :
+Pouvoir appliquer des forces partant de la balle
+
+
+Compte-tenu du temps passé sur ODE, suppression des empilements et de la simulation physique
+=> bounding boxes : cercles (algo naïf en n² dans un premier temps)
+=> modèles à prévoir en circonstance
+
+Pas satisfaisant => utilisation de JBox2D, qui marche bien pour les collisions et permet de gérer le joueur à part ("Static Body")
+
+Jalon 4 : ajout de murs [fait]
+
+Jalon 5 : ajout d'ennemis (bien si static bodies) [fait] => fin de journée
+
+
+

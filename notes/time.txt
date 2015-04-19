@@ -1,0 +1,21 @@
+Samedi :
+ 9h : arrivée à Shiro Games
+10h : fin de la configuration réseau, etc.
+11h : projet eclipse/gradle avec libs configuré et compile ; 3 premiers jalons déterminés
+12h : première boucle de simulation physique joueur + plan (sol) => sortie console. Résultats semblent cohérents
+12h30->13h30 : repas
+14h : premier rendu piloté par la physique
+14h45 : détection contrôleur + application de force sur le joueur pour le déplacer (jalon 1 atteint)
+15h10 : dampening sur joueur pas satisfaisant, amélioration mouvement joueur abandonnée pour l'instant
+17h45 : ajout d'une boîte avec collisions, améliorations code de rendu mais tuning physique trop long => ODE abandonné
+18h45 : recodé sans moteur : déplacements joueur & attraction boîtes OK
+19h10 : trop compliqué d'éviter l'interpénétration entre éléments du décor => tentative de simulation avec Box2D
+20h : box2D m'apporte les collisions et une gestion correcte des forces. Manque damping
+20h15->21h15 : pause
+22h : murs ajoutés (rendu + collisions boîtes + collisions joueur)
+23h : ennemi ajouté (rendu + collision boîtes)
+
+Dimanche :
+10h45 : début codage
+11h15 : refactoring : programme OpenGL isolé
+

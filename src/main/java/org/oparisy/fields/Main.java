@@ -3,7 +3,6 @@ package org.oparisy.fields;
 import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
 import static org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT;
 import static org.lwjgl.opengl.GL11.GL_DEPTH_TEST;
-import static org.lwjgl.opengl.GL11.GL_FLOAT;
 import static org.lwjgl.opengl.GL11.GL_LESS;
 import static org.lwjgl.opengl.GL11.GL_LINEAR;
 import static org.lwjgl.opengl.GL11.GL_RGB;
@@ -23,21 +22,6 @@ import static org.lwjgl.opengl.GL11.glGenTextures;
 import static org.lwjgl.opengl.GL11.glGetString;
 import static org.lwjgl.opengl.GL11.glTexImage2D;
 import static org.lwjgl.opengl.GL11.glTexParameteri;
-import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
-import static org.lwjgl.opengl.GL13.glActiveTexture;
-import static org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER;
-import static org.lwjgl.opengl.GL15.glBindBuffer;
-import static org.lwjgl.opengl.GL15.glDeleteBuffers;
-import static org.lwjgl.opengl.GL20.GL_FRAGMENT_SHADER;
-import static org.lwjgl.opengl.GL20.GL_VERTEX_SHADER;
-import static org.lwjgl.opengl.GL20.glDeleteShader;
-import static org.lwjgl.opengl.GL20.glDisableVertexAttribArray;
-import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
-import static org.lwjgl.opengl.GL20.glUniform1i;
-import static org.lwjgl.opengl.GL20.glUniform3f;
-import static org.lwjgl.opengl.GL20.glUniformMatrix4;
-import static org.lwjgl.opengl.GL20.glUseProgram;
-import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL30.glGenVertexArrays;
 
@@ -80,9 +64,6 @@ public class Main {
 	/* Beyond this distance, player does not exerce a force */
 	private static final double MAX_PLAYER_INFLUENCE = 10;
 
-	private static final int MAX_CONTACTS = 64; // maximum number of contact
-												// points per body
-
 	// Note that player has no velocity (only boxes are simulated)
 	private PhysicalState physicalPlayer;
 	private List<PhysicalState> physicalBox = new ArrayList<PhysicalState>();
@@ -98,26 +79,9 @@ public class Main {
 	private static final int SCREEN_WIDTH = 1024;
 
 	// Resources (shader sources) location
-	private static final String RES = "fields"; //Main.class.getPackage().getName().replace(".", "/");
-
-	private static final String vertexShaderFile = RES + "/" + "StandardShading.vertexshader";
-	private static final String fragmentShaderFile = RES + "/" + "StandardShading.fragmentshader";
+	private static final String RES = "fields"; // Main.class.getPackage().getName().replace(".", "/");
 
 	private int texture;
-
-	private int program;
-
-	/** Shader uniforms */
-	private int mvpID;
-	private int vID;
-	private int mID;
-	private int lightPosID;
-	private int samplerID;
-
-	/** Vertex attributes */
-	private int posID;
-	private int uvID;
-	private int normalID;
 
 	private OpenGLMesh playerMesh;
 	private Matrix4f playerMatrix;
@@ -129,7 +93,6 @@ public class Main {
 	private Vector3f lightPos = new Vector3f(4, 4, 4);
 
 	private Matrix4f viewMatrix;
-	private Matrix4f mvpMatrix;
 
 	private double lastTime;
 	private Matrix4f vpMatrix;
@@ -137,10 +100,13 @@ public class Main {
 	private World world;
 
 	private List<Wall> walls = new ArrayList<Wall>();
+	private List<Matrix4f> wallsMatrix = new ArrayList<Matrix4f>();
 
 	private OpenGLMesh enemyMesh;
 	private List<Enemy> enemies = new ArrayList<Enemy>();
 	private List<Matrix4f> enemiesMatrix = new ArrayList<Matrix4f>();
+
+	private ShadingProgram shadingProgram;
 
 	public int uploadTexture(BufferedImage img) {
 		img = Tools.flipVertically(img);
@@ -162,14 +128,6 @@ public class Main {
 		return textureID;
 	}
 
-	public void buildProgram() throws Exception, Error {
-		int vs = Tools.makeShader(GL_VERTEX_SHADER, vertexShaderFile);
-		int fs = Tools.makeShader(GL_FRAGMENT_SHADER, fragmentShaderFile);
-		program = Tools.makeProgram(vs, fs);
-		glDeleteShader(vs);
-		glDeleteBuffers(fs);
-	}
-
 	private void run() throws Exception {
 		setupRender();
 
@@ -180,7 +138,6 @@ public class Main {
 
 		mainLoop();
 
-		closeODE();
 		Display.destroy();
 	}
 
@@ -209,8 +166,7 @@ public class Main {
 		boxMesh = new OpenGLMesh(Tools.loadResource(RES + "/boxuv.obj"));
 		enemyMesh = new OpenGLMesh(Tools.loadResource(RES + "/enemy.obj"));
 
-		// Program must be compiled before binding buffers (why?)
-		buildProgram();
+		shadingProgram = new ShadingProgram();
 
 		// Required in OpenGL 3
 		int vao = glGenVertexArrays();
@@ -221,17 +177,6 @@ public class Main {
 		boxMesh.uploadToGPU();
 		enemyMesh.uploadToGPU();
 		texture = uploadTexture(img);
-
-		// Required by render()
-		posID = Tools.glGetAttribLocationChecked(program, "vertexPosition_modelspace");
-		uvID = Tools.glGetAttribLocationChecked(program, "vertexUV");
-		normalID = Tools.glGetAttribLocationChecked(program, "vertexNormal_modelspace");
-
-		mvpID = Tools.glGetUniformLocationChecked(program, "MVP");
-		mID = Tools.glGetUniformLocationChecked(program, "M");
-		vID = Tools.glGetUniformLocationChecked(program, "V");
-		lightPosID = Tools.glGetUniformLocationChecked(program, "LightPosition_worldspace");
-		samplerID = Tools.glGetUniformLocationChecked(program, "myTextureSampler");
 
 		// Global OpenGL setup
 		glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
@@ -280,12 +225,6 @@ public class Main {
 
 			quit = Keyboard.isKeyDown(Keyboard.KEY_Q) || Keyboard.isKeyDown(Keyboard.KEY_ESCAPE);
 
-			/*
-			 * Between each integrator step the user can call functions to apply forces to the rigid body. These forces are added to
-			 * "force accumulators" in the rigid body object. When the next integrator step happens, the sum of all the applied forces will
-			 * be used to push the body around. The forces accumulators are set to zero after each integrator step.
-			 */
-
 			if (controller != null && ControllerSetup.isControllerInitialised()) {
 
 				// StringBuilder sb = new StringBuilder();
@@ -298,26 +237,6 @@ public class Main {
 				float x = controller.getAxisValue(1);
 				float y = -controller.getAxisValue(0);
 				// System.out.println("x: " + x + " y: " + y);
-
-				// TODO Damping is not satisfying => this could be a solution? (no physical movement simulation for player)
-				/*
-				 * How do I make "one way" collision interaction
-				 * 
-				 * Suppose you need to have two bodies (A and B) collide. The motion of A should affect the motion of B as usual, but B
-				 * should not influence A at all. This might be necessary, for example, if B is a physically simulated camera in a VR
-				 * environment. The camera needs collision response so that it doesn't enter into any scene objects by mistake, but the
-				 * motion of the camera should not affect the simulation. How can this be achieved?
-				 * 
-				 * To solve this, attach a contact joint between B and null (the world), then set the contact joint's motion fields to match
-				 * A's velocities at the contact point. See the demo_motion.cpp sample distributed with ODE for an example.
-				 */
-
-				// DVector3C linVel = playerBody.getLinearVel();
-				// System.out.println("Linear velocity: " + linVel.length());
-
-				// if (Math.abs(x)<0.01f && Math.abs(y) < 0.01f) {
-				// playerBody.addForce(linVel.get0() * -0.5, linVel.get(1) * -0.5, 0);
-				// } else {
 
 				// Detect collisions with borders (walls)
 				// TODO Take player size into account
@@ -341,14 +260,6 @@ public class Main {
 					for (PhysicalState physicalBox : this.physicalBox) {
 						// Compute vector from box to player
 						Vec2 delta = physicalBox.getPosition().sub(physicalPlayer.getPosition());
-						// float vecx = physicalBox.getX() - physicalPlayer.getX();
-						// float vecy = physicalBox.getY() - physicalPlayer.getY();
-						// DVector3C playerPosition = physicalPlayer.getBody().getPosition();
-						// DVector3C boxPosition = physicalBox.getBody().getPosition();
-						// double vecx = boxPosition.get0() - playerPosition.get0();
-						// double vecy = boxPosition.get1() - playerPosition.get1();
-						// double vecz = boxPosition.get2() - playerPosition.get2();
-						//
 
 						// Compute an attraction force
 						float coef = 0.3f;
@@ -377,7 +288,7 @@ public class Main {
 							// physicalBox.setX(newPosX);
 							// physicalBox.setY(newPosY);
 							// }
-							
+
 							if (controller.isButtonPressed(1)) {
 								// Repulsive force
 								force = force.negate();
@@ -399,6 +310,9 @@ public class Main {
 			updatePlayerMatrix();
 
 			updateBoxesMatrix();
+			
+			// Could be done out of the render loop since walls do not move
+			updateWallsMatrix();
 
 			updateEnemyMatrix();
 
@@ -415,6 +329,17 @@ public class Main {
 				Display.setTitle(this.getClass().getSimpleName() + " - " + fps + " FPS");
 				fps = 0;
 			}
+		}
+	}
+
+	private void updateWallsMatrix() {
+		wallsMatrix.clear();
+		for (Wall wall : walls) {
+			Matrix4f modelMatrix = new Matrix4f();
+			PhysicalState ps = wall.getState();
+			modelMatrix.translate(new Vector3f(ps.getPosition().x, ps.getPosition().y, 0));
+			modelMatrix.scale(new Vector3f(wall.getW(), wall.getH(), Math.min(wall.getW(), wall.getH())));
+			wallsMatrix.add(modelMatrix);
 		}
 	}
 
@@ -441,12 +366,7 @@ public class Main {
 
 	private void updateBoxesMatrix() {
 		boxesMatrix.clear();
-		// Matrix4f boxMatrix = new Matrix4f();
-		// boxMatrix.translate(new Vector3f(0, 5, 2));
 		// Get position and orientation from simulated object
-
-		// DVector3C pos = physicalBox.getGeom().getPosition();
-
 		for (PhysicalState physicalBox : this.physicalBox) {
 			Matrix4f boxMatrix = new Matrix4f();
 			boxMatrix.translate(new Vector3f(physicalBox.getPosition().x, physicalBox.getPosition().y, 0));
@@ -457,10 +377,6 @@ public class Main {
 	}
 
 	private void updatePlayerMatrix() {
-
-		// Get position and orientation from simulated object
-		// DVector3C pos = physicalPlayer.getGeom().getPosition();
-
 		playerMatrix = new Matrix4f();
 		playerMatrix.translate(new Vector3f(physicalPlayer.getPosition().x, physicalPlayer.getPosition().y, 0));
 		playerMatrix.scale(new Vector3f(0.5f, 0.5f, 0.5f));
@@ -481,90 +397,43 @@ public class Main {
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		glUseProgram(program);
-		glUniformMatrix4(vID, false, Tools.buildFloatBuffer(viewMatrix));
-
-		glUniform3f(lightPosID, lightPos.x, lightPos.y, lightPos.z);
-
-		// Bind texture to texture unit 0
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, texture);
-		glUniform1i(samplerID, 0);
+		shadingProgram.use();
+		shadingProgram.setViewMatrix(viewMatrix);
+		shadingProgram.setLightPos(lightPos);
+		shadingProgram.bindTexture(texture);
 
 		// Prepare program for buffers binding
-		glEnableVertexAttribArray(posID);
-		glEnableVertexAttribArray(uvID);
-		glEnableVertexAttribArray(normalID);
+		shadingProgram.enableVertexAttribArrays();
 
 		// Render player
-		bindMeshBuffers(playerMesh);
-
+		shadingProgram.bindMeshBuffers(playerMesh);
 		{
-			Matrix4f modelMatrix = playerMatrix;// Matrix4f.translate(new Vector3f(i * 5, 0, 0), playerMatrix, null);
-
-			this.mvpMatrix = Matrix4f.mul(vpMatrix, modelMatrix, null);
-			glUniformMatrix4(mvpID, false, Tools.buildFloatBuffer(mvpMatrix));
-			glUniformMatrix4(mID, false, Tools.buildFloatBuffer(modelMatrix));
-
+			shadingProgram.updateMVPMatrix(vpMatrix, playerMatrix);
 			glDrawArrays(GL_TRIANGLES, 0, playerMesh.getTriangleCount() * 3);
 		}
 
 		// Render boxes
-		bindMeshBuffers(boxMesh);
-
+		shadingProgram.bindMeshBuffers(boxMesh);
 		for (Matrix4f boxMatrix : boxesMatrix) {
-			Matrix4f modelMatrix = boxMatrix;
-
-			this.mvpMatrix = Matrix4f.mul(vpMatrix, modelMatrix, null);
-			glUniformMatrix4(mvpID, false, Tools.buildFloatBuffer(mvpMatrix));
-			glUniformMatrix4(mID, false, Tools.buildFloatBuffer(modelMatrix));
-
+			shadingProgram.updateMVPMatrix(vpMatrix, boxMatrix);
 			glDrawArrays(GL_TRIANGLES, 0, boxMesh.getTriangleCount() * 3);
 		}
 
 		// Render walls
-		bindMeshBuffers(boxMesh);
-
-		for (Wall wall : walls) {
-			Matrix4f modelMatrix = new Matrix4f();
-			PhysicalState ps = wall.getState();
-			modelMatrix.translate(new Vector3f(ps.getPosition().x, ps.getPosition().y, 0));
-			modelMatrix.scale(new Vector3f(wall.getW(), wall.getH(), Math.min(wall.getW(), wall.getH())));
-
-			this.mvpMatrix = Matrix4f.mul(vpMatrix, modelMatrix, null);
-			glUniformMatrix4(mvpID, false, Tools.buildFloatBuffer(mvpMatrix));
-			glUniformMatrix4(mID, false, Tools.buildFloatBuffer(modelMatrix));
-
+		shadingProgram.bindMeshBuffers(boxMesh);
+		for (Matrix4f wallMatrix : wallsMatrix) {
+			shadingProgram.updateMVPMatrix(vpMatrix, wallMatrix);
 			glDrawArrays(GL_TRIANGLES, 0, boxMesh.getTriangleCount() * 3);
 		}
 
 		// Render enemies
-		bindMeshBuffers(enemyMesh);
-
+		shadingProgram.bindMeshBuffers(enemyMesh);
 		for (Matrix4f enemy : enemiesMatrix) {
-			Matrix4f modelMatrix = enemy;
-
-			this.mvpMatrix = Matrix4f.mul(vpMatrix, modelMatrix, null);
-			glUniformMatrix4(mvpID, false, Tools.buildFloatBuffer(mvpMatrix));
-			glUniformMatrix4(mID, false, Tools.buildFloatBuffer(modelMatrix));
-
+			shadingProgram.updateMVPMatrix(vpMatrix, enemy);
 			glDrawArrays(GL_TRIANGLES, 0, enemyMesh.getTriangleCount() * 3);
 		}
 
-		glDisableVertexAttribArray(posID);
-		glDisableVertexAttribArray(uvID);
-		glDisableVertexAttribArray(normalID);
-	}
-
-	private void bindMeshBuffers(OpenGLMesh openGLMesh) {
-		glBindBuffer(GL_ARRAY_BUFFER, openGLMesh.getVertexBuffer());
-		glVertexAttribPointer(posID, 3, GL_FLOAT, false, 0, 0);
-
-		glBindBuffer(GL_ARRAY_BUFFER, openGLMesh.getUvBuffer());
-		glVertexAttribPointer(uvID, 2, GL_FLOAT, false, 0, 0);
-
-		glBindBuffer(GL_ARRAY_BUFFER, openGLMesh.getNormalBuffer());
-		glVertexAttribPointer(normalID, 3, GL_FLOAT, false, 0, 0);
+		shadingProgram.disableVertexAttribArrays();
 	}
 
 	private void runOneSimulationStep() {
@@ -573,10 +442,6 @@ public class Main {
 		int positionIterations = 2;
 
 		world.step(timeStep, velocityIterations, positionIterations);
-	}
-
-	private void closeODE() {
-
 	}
 
 	private void setupPhysicalEntities() {
@@ -629,7 +494,6 @@ public class Main {
 	public static void main(String[] args) {
 		System.out.println("Starting.");
 		try {
-			// new Main().runPhysics();
 			new Main().run();
 		} catch (Exception e) {
 			e.printStackTrace();
