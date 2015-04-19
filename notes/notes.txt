@@ -48,4 +48,13 @@ Jalon 4 : ajout de murs [fait]
 Jalon 5 : ajout d'ennemis (bien si static bodies) [fait] => fin de journée
 
 
-
+Objectifs demanche :
+ * Jalon 1 : détection collisions => barres de vie
+ * Jalon 2 : évènements de jeu (game over, scoring, "niveau suivant")
+ * Jalon 3 : affichage de ces informations
+ * Poster une update
+ * Jalon 4 : remodéliser placeholders
+ * Jalon 5 : écran titre
+ * Jalon 6 : sons
+ * Jalon 6 : tuning gameplay
+ * Jalon 7 : tuning rendu

@@ -18,4 +18,7 @@ Samedi :
 Dimanche :
 10h45 : début codage
 11h15 : refactoring : programme OpenGL isolé
-
+13h00 : fonte dessinée, sons trouvés
+13h20 : son joué sur collision
+13h20 -> 14h : repas
+15h15 : sons joués proprement sur les différents types de collisions

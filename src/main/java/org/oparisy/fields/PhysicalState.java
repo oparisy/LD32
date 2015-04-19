@@ -5,6 +5,7 @@ import org.jbox2d.common.Vec2;
 import org.jbox2d.dynamics.Body;
 import org.jbox2d.dynamics.BodyDef;
 import org.jbox2d.dynamics.BodyType;
+import org.jbox2d.dynamics.Fixture;
 import org.jbox2d.dynamics.FixtureDef;
 import org.jbox2d.dynamics.World;
 
@@ -15,8 +16,11 @@ public class PhysicalState {
 	private BodyDef bd;
 	private FixtureDef fd;
 	private Body body;
+	private GameEntity entity;
 
-	public PhysicalState(float x, float y, World world, BodyType type, Shape shape) {
+	public PhysicalState(float x, float y, World world, BodyType type, Shape shape, GameEntity entity) {
+
+		this.entity = entity;
 
 		bd = new BodyDef();
 		bd.position.set(x, y);
@@ -29,7 +33,11 @@ public class PhysicalState {
 		fd.restitution = 0.5f;
 
 		body = world.createBody(bd);
-		body.createFixture(fd);
+		Fixture fixture = body.createFixture(fd);
+
+		// Used to navigate back to this instance when processing collisions
+		body.setUserData(this);
+		fixture.setUserData(this);
 
 		// Avoid "floating" boxes
 		body.setLinearDamping(0.1f);
@@ -50,5 +58,9 @@ public class PhysicalState {
 
 	public void applyForce(Vec2 force, Vec2 point) {
 		body.applyForce(force, point);
+	}
+	
+	public GameEntity getEntity() {
+		return entity;
 	}
 }

@@ -33,10 +33,13 @@ import java.util.List;
 
 import javax.imageio.ImageIO;
 
-import org.jbox2d.collision.shapes.CircleShape;
+import org.apache.commons.lang3.StringUtils;
+import org.jbox2d.callbacks.ContactImpulse;
+import org.jbox2d.callbacks.ContactListener;
+import org.jbox2d.collision.Manifold;
 import org.jbox2d.common.Vec2;
-import org.jbox2d.dynamics.BodyType;
 import org.jbox2d.dynamics.World;
+import org.jbox2d.dynamics.contacts.Contact;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Controller;
 import org.lwjgl.input.Keyboard;
@@ -46,10 +49,13 @@ import org.lwjgl.opengl.DisplayMode;
 import org.lwjgl.opengl.PixelFormat;
 import org.lwjgl.util.vector.Matrix4f;
 import org.lwjgl.util.vector.Vector3f;
+import org.oparisy.fields.tools.audio.SoundManager;
 import org.oparisy.fields.tools.common.ControllerSetup;
 import org.oparisy.fields.tools.common.Tools;
 
 public class Main {
+
+	private static final int BOX_NB = 2;
 
 	private static final int WALL_BOTTOM = 5;
 
@@ -64,9 +70,8 @@ public class Main {
 	/* Beyond this distance, player does not exerce a force */
 	private static final double MAX_PLAYER_INFLUENCE = 10;
 
-	// Note that player has no velocity (only boxes are simulated)
-	private PhysicalState physicalPlayer;
-	private List<PhysicalState> physicalBox = new ArrayList<PhysicalState>();
+	private Player player;
+	private List<Box> physicalBox = new ArrayList<Box>();
 
 	private Controller controller;
 
@@ -108,6 +113,18 @@ public class Main {
 
 	private ShadingProgram shadingProgram;
 
+	private org.oparisy.fields.tools.audio.SoundManager soundManager;
+
+	private int enemyKill;
+
+	private int gameOver;
+
+	private int ouch;
+
+	private int weeUup;
+
+	private int collision;
+
 	public int uploadTexture(BufferedImage img) {
 		img = Tools.flipVertically(img);
 		ByteBuffer pixels = Tools.imageToByteBuffer(img);
@@ -129,6 +146,7 @@ public class Main {
 	}
 
 	private void run() throws Exception {
+		setupSound();
 		setupRender();
 
 		setupPhysics();
@@ -139,6 +157,19 @@ public class Main {
 		mainLoop();
 
 		Display.destroy();
+		soundManager.destroy();
+	}
+
+	private void setupSound() {
+		soundManager = new SoundManager();
+		soundManager.initialize(16);
+
+		// load our sound data
+		collision = soundManager.addSound("fields/collision.wav");
+		enemyKill = soundManager.addSound("fields/enemyKill.wav");
+		gameOver = soundManager.addSound("fields/gameOver.wav");
+		ouch = soundManager.addSound("fields/ouch.wav");
+		weeUup = soundManager.addSound("fields/weeUup.wav");
 	}
 
 	private void detectController() {
@@ -241,7 +272,7 @@ public class Main {
 				// Detect collisions with borders (walls)
 				// TODO Take player size into account
 				Vec2 playerDeltaPos = new Vec2(x / 20f, y / 20f);
-				Vec2 newPos = physicalPlayer.getPosition().add(playerDeltaPos);
+				Vec2 newPos = player.getState().getPosition().add(playerDeltaPos);
 				if (newPos.x < WALL_LEFT + WALL_WIDTH || newPos.x > WALL_RIGHT - WALL_WIDTH) {
 					playerDeltaPos.x = 0;
 				}
@@ -249,7 +280,7 @@ public class Main {
 					playerDeltaPos.y = 0;
 				}
 
-				physicalPlayer.addToPos(playerDeltaPos);
+				player.getState().addToPos(playerDeltaPos);
 				// physicalPlayer.setX(physicalPlayer.getX() + x / 20f);
 				// physicalPlayer.setX(physicalPlayer.getX() + y / 20f);
 				//
@@ -257,9 +288,11 @@ public class Main {
 				// }
 
 				if (controller.isButtonPressed(0) || controller.isButtonPressed(1)) {
-					for (PhysicalState physicalBox : this.physicalBox) {
+					for (Box box : this.physicalBox) {
+						PhysicalState physicalBox = box.getState();
+
 						// Compute vector from box to player
-						Vec2 delta = physicalBox.getPosition().sub(physicalPlayer.getPosition());
+						Vec2 delta = physicalBox.getPosition().sub(player.getState().getPosition());
 
 						// Compute an attraction force
 						float coef = 0.3f;
@@ -310,7 +343,7 @@ public class Main {
 			updatePlayerMatrix();
 
 			updateBoxesMatrix();
-			
+
 			// Could be done out of the render loop since walls do not move
 			updateWallsMatrix();
 
@@ -346,7 +379,7 @@ public class Main {
 	private void runIA() {
 		// Move enemies according to player position
 		for (Enemy enemy : enemies) {
-			Vec2 dir = physicalPlayer.getPosition().sub(enemy.getState().getPosition());
+			Vec2 dir = player.getState().getPosition().sub(enemy.getState().getPosition());
 			dir.normalize();
 			dir = dir.mul(0.005f); // Enemy speed
 			enemy.getState().addToPos(dir);
@@ -367,7 +400,8 @@ public class Main {
 	private void updateBoxesMatrix() {
 		boxesMatrix.clear();
 		// Get position and orientation from simulated object
-		for (PhysicalState physicalBox : this.physicalBox) {
+		for (Box box : this.physicalBox) {
+			PhysicalState physicalBox = box.getState();
 			Matrix4f boxMatrix = new Matrix4f();
 			boxMatrix.translate(new Vector3f(physicalBox.getPosition().x, physicalBox.getPosition().y, 0));
 			boxMatrix.scale(new Vector3f(0.25f, 0.25f, 0.25f));
@@ -378,7 +412,7 @@ public class Main {
 
 	private void updatePlayerMatrix() {
 		playerMatrix = new Matrix4f();
-		playerMatrix.translate(new Vector3f(physicalPlayer.getPosition().x, physicalPlayer.getPosition().y, 0));
+		playerMatrix.translate(new Vector3f(player.getState().getPosition().x, player.getState().getPosition().y, 0));
 		playerMatrix.scale(new Vector3f(0.5f, 0.5f, 0.5f));
 	}
 
@@ -452,43 +486,134 @@ public class Main {
 	}
 
 	private void createEnemies() {
-		CircleShape cs = new CircleShape();
-		cs.m_radius = 0.5f;
-		enemies.add(new Enemy(1, -3, world));
+		enemies.add(new Enemy(1, -3, world, "Enemy"));
 	}
 
 	private void createWalls() {
 		// Left
-		walls.add(new Wall(WALL_LEFT, 0, WALL_WIDTH, 6.3f, world));
+		walls.add(new Wall(WALL_LEFT, 0, WALL_WIDTH, 6.3f, world, "Left Wall"));
 
 		// Right
-		walls.add(new Wall(WALL_RIGHT, 0, WALL_WIDTH, 6.3f, world));
+		walls.add(new Wall(WALL_RIGHT, 0, WALL_WIDTH, 6.3f, world, "Right Wall"));
 
 		// Top
-		walls.add(new Wall(0, WALL_TOP, 10, WALL_WIDTH, world));
+		walls.add(new Wall(0, WALL_TOP, 10, WALL_WIDTH, world, "Top Wall"));
 
 		// Bottom
-		walls.add(new Wall(0, WALL_BOTTOM, 10, WALL_WIDTH, world));
+		walls.add(new Wall(0, WALL_BOTTOM, 10, WALL_WIDTH, world, "Bottom Wall"));
 	}
 
 	private void createPhysicalBox() {
-		for (int i = 0; i < 10; i++) {
-			CircleShape cs = new CircleShape();
-			cs.m_radius = 0.5f;
-			physicalBox.add(new PhysicalState(5 - i, 5, world, BodyType.DYNAMIC, cs));
+		for (int i = 0; i < BOX_NB; i++) {
+			physicalBox.add(new Box(5 - i, 5, world, "Box#" + i));
 		}
 	}
 
 	private void createPhysicalPlayer() {
-		CircleShape cs = new CircleShape();
-		cs.m_radius = 0.5f;
-		physicalPlayer = new PhysicalState(0, 0, world, BodyType.STATIC, cs);
+		player = new Player(0, 0, world, "Player");
 	}
 
 	private void setupPhysics() {
 		Vec2 gravity = new Vec2(0.0f, 0.0f);
 		boolean doSleep = true;
 		world = new World(gravity, doSleep);
+
+		// See http://www.iforce2d.net/b2dtut/collision-callbacks
+		world.setContactListener(new ContactListener() {
+			public void preSolve(Contact contact, Manifold oldManifold) {
+			}
+
+			public void postSolve(Contact contact, ContactImpulse impulse) {
+				onPostSolve(contact, impulse);
+			}
+
+			public void beginContact(Contact contact) {
+				onBeginContact(contact);
+			}
+
+			public void endContact(Contact contact) {
+				onEndContact(contact);
+			}
+		});
+	}
+
+	private CollisionStore collisionStore = new CollisionStore();
+
+	/**
+	 * A contact occured. This method provide "collision strength" informations, see
+	 * http://blog.allanbishop.com/box-2d-2-1a-tutorial-part-6-collision-strength/
+	 */
+	protected void onPostSolve(Contact contact, ContactImpulse impulse) {
+		// Seem to be called even when there is not collision => early check
+		// Low-impulse collisions append on contact; filter thoseto avoid continuously playing sounds
+		if (impulse.normalImpulses[0] < 1e-2) {
+			return;
+		}
+
+		PhysicalState obj1 = (PhysicalState) contact.getFixtureA().getUserData();
+		PhysicalState obj2 = (PhysicalState) contact.getFixtureB().getUserData();
+
+		GameEntity e1 = obj1.getEntity();
+		GameEntity e2 = obj2.getEntity();
+
+		// Order entities to limit combinations to: Box/Box, Box/Enemy, Box/Player, Box/Wall, Enemy/Wall, Player/Wall
+		// Enemy/Player are not detected here (since both are static bodies)
+		if (e1.getClass().getName().compareTo(e2.getClass().getName()) > 0) {
+			GameEntity tmp = e1;
+			e1 = e2;
+			e2 = tmp;
+		}
+
+		if ((e1 instanceof Player || e1 instanceof Wall) && e2 instanceof Wall) {
+			// No gameplay effect, no sound
+			return;
+		}
+
+		if (e1 instanceof Box && (e2 instanceof Box || e2 instanceof Wall)) {
+			// No gameplay effect, collision sound
+			if (!collisionStore.recentlyCollided(e1, e2)) {
+				soundManager.playEffect(collision);
+			}
+			return;
+		}
+
+		List<String> impStr = new ArrayList<String>();
+		for (int i = 0; i < impulse.normalImpulses.length; i++) {
+			impStr.add(Float.toString(impulse.normalImpulses[i]));
+		}
+
+		System.out.println("Contact between " + e1.getName() + " and " + e2.getName() + "; normal impulse is ["
+				+ StringUtils.join(impStr, ", ") + "]");
+		
+		if (e2 instanceof Enemy) {
+			// Enemy is hit by a box! High damage
+			if (!collisionStore.recentlyCollided(e1, e2)) {
+				soundManager.playEffect(this.weeUup);
+			}
+			return;
+		}
+		
+		if (e2 instanceof Player) {
+			// Player is hit by a box! Low damage
+			if (!collisionStore.recentlyCollided(e1, e2)) {
+				soundManager.playEffect(this.ouch);
+			}
+			return;
+		}
+	}
+
+	/** A contact occured between two fixtures */
+	private void onBeginContact(Contact contact) {
+		// PhysicalState obj1 = (PhysicalState) contact.getFixtureA().getUserData();
+		// PhysicalState obj2 = (PhysicalState) contact.getFixtureB().getUserData();
+		// System.out.println("Begin contact between " + obj1.getName() + " and " + obj2.getName());
+	}
+
+	/** A contact ended between two fixtures */
+	private void onEndContact(Contact contact) {
+		// PhysicalState obj1 = (PhysicalState) contact.getFixtureA().getUserData();
+		// PhysicalState obj2 = (PhysicalState) contact.getFixtureB().getUserData();
+		// System.out.println("End contact between " + obj1.getName() + " and " + obj2.getName());
 	}
 
 	public static void main(String[] args) {
