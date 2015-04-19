@@ -33,7 +33,6 @@ import java.util.List;
 
 import javax.imageio.ImageIO;
 
-import org.apache.commons.lang3.StringUtils;
 import org.jbox2d.callbacks.ContactImpulse;
 import org.jbox2d.callbacks.ContactListener;
 import org.jbox2d.collision.Manifold;
@@ -284,11 +283,6 @@ public class Main {
 				}
 
 				player.getState().addToPos(playerDeltaPos);
-				// physicalPlayer.setX(physicalPlayer.getX() + x / 20f);
-				// physicalPlayer.setX(physicalPlayer.getX() + y / 20f);
-				//
-				// System.out.println("Position: " + physicalPlayer.getPosx() + " " + physicalPlayer.getPosy());
-				// }
 
 				if (controller.isButtonPressed(0) || controller.isButtonPressed(1)) {
 					for (Box box : this.physicalBox) {
@@ -307,23 +301,6 @@ public class Main {
 						if (len > 0.02f) {
 							// Divided by len => unit vector, then by len => inverse of distance
 							Vec2 force = delta.negate().mul(coef / (len * len));
-							// float newPosX = physicalBox.getX() - vecx * coef / (len * len);
-							// float newPosY = physicalBox.getY() - vecy * coef / (len * len);
-							//
-							// boolean isNearBox = false;
-							// // for (PhysicalState otherBox : this.physicalBox) {
-							// // float dist = distance(newPosX, newPosY, otherBox.getX(), otherBox.getY());
-							// // if (dist < 1f) {
-							// // isNearBox = true;
-							// // otherBox.addToPos((newPosX-otherBox.getX())/(2*dist), (newPosY-otherBox.getY())/(2*dist));
-							// // break;
-							// // }
-							// // }
-							//
-							// if (!isNearBox) {
-							// physicalBox.setX(newPosX);
-							// physicalBox.setY(newPosY);
-							// }
 
 							if (controller.isButtonPressed(1)) {
 								// Repulsive force
@@ -332,9 +309,6 @@ public class Main {
 
 							physicalBox.applyForce(force, physicalBox.getPosition());
 						}
-
-						// //physicalBox.getBody().addForce(new DVector3(vecx*0.1, vecy*0.1, vecz*0.1));
-						// physicalBox.getBody().addForce(1,0,0);
 					}
 				}
 			}
@@ -383,48 +357,13 @@ public class Main {
 		// Compute a force to "steer" enemy to player
 		for (Enemy enemy : enemies) {
 
-			// System.out.println("Player position: " + player.getState().getPosition());
-			// System.out.println("Enemy position: " + enemy.getState().getPosition());
-
 			Vec2 dir = player.getState().getPosition().sub(enemy.getState().getPosition());
 			dir.normalize();
 
-			// System.out.println("Enemy => player direction: " + dir);
-
-			Vec2 f;
-
-			Vec2 enemyDir = enemy.getState().getLinarVelocity();
-			if (enemyDir.length() < 1e-2) {
-				// Enemy is too slow; just apply a force to player
-				f = dir.mul(0.005f);
-			} else {
-				// Take enemy speed into account
-
-				enemyDir.normalize();
-
-				// System.out.println("Enemy direction: " + enemyDir);
-
-				// Will go from 2 (opposed direction) to 0 (same direction)
-				float error = 1 - Vec2.dot(dir, enemyDir);
-
-				// System.out.println("error: " + error);
-
-				f = dir.mul(error * -0.005f);
-			}
-
-			// System.out.println("Applied force: " + f);
-			enemy.getState().applyForce(dir, enemy.getState().getPosition());
+			// Enemy speed
+			Vec2 f = dir.mul(0.5f);
+			enemy.getState().applyForce(f, enemy.getState().getPosition());
 		}
-
-		/*
-		 * // Move enemies according to player position
-		 * for (Enemy enemy : enemies) {
-		 * Vec2 dir = player.getState().getPosition().sub(enemy.getState().getPosition());
-		 * dir.normalize();
-		 * dir = dir.mul(0.005f); // Enemy speed
-		 * enemy.getState().addToPos(dir);
-		 * }
-		 */
 	}
 
 	private void updateEnemyMatrix() {
@@ -569,11 +508,9 @@ public class Main {
 			}
 
 			public void beginContact(Contact contact) {
-				onBeginContact(contact);
 			}
 
 			public void endContact(Contact contact) {
-				onEndContact(contact);
 			}
 		});
 	}
@@ -623,6 +560,8 @@ public class Main {
 			impStr.add(Float.toString(impulse.normalImpulses[i]));
 		}
 
+		float force = impulse.normalImpulses[0];
+
 		// System.out.println("Contact between " + e1.getName() + " and " + e2.getName() + "; normal impulse is ["
 		// + StringUtils.join(impStr, ", ") + "]");
 
@@ -631,6 +570,8 @@ public class Main {
 			if (!collisionStore.recentlyCollided(e1, e2)) {
 				soundManager.playEffect(this.highOuch);
 			}
+
+			dealDamage((Player) e2, force * 5f);
 			return;
 		}
 
@@ -639,6 +580,8 @@ public class Main {
 			if (!collisionStore.recentlyCollided(e1, e2)) {
 				soundManager.playEffect(this.weeUup);
 			}
+
+			dealDamage((Enemy) e2, force * 2f);
 			return;
 		}
 
@@ -647,22 +590,36 @@ public class Main {
 			if (!collisionStore.recentlyCollided(e1, e2)) {
 				soundManager.playEffect(this.ouch);
 			}
+
+			dealDamage((Player) e2, force / 2f);
 			return;
 		}
 	}
 
-	/** A contact occured between two fixtures */
-	private void onBeginContact(Contact contact) {
-		// PhysicalState obj1 = (PhysicalState) contact.getFixtureA().getUserData();
-		// PhysicalState obj2 = (PhysicalState) contact.getFixtureB().getUserData();
-		// System.out.println("Begin contact between " + obj1.getName() + " and " + obj2.getName());
+	private void dealDamage(AliveEntity entity, float damage) {
+		float newHealth = entity.getHealth() - damage;
+		entity.setHealth(newHealth);
+		if (newHealth < 0) {
+			System.out.println(entity.getName() + " is dead!");
+
+			if (entity instanceof Enemy) {
+				onEnemyDeath((Enemy) entity);
+			} else {
+				onPlayerDeath();
+			}
+		} else {
+			System.out.println(entity.getName() + " health is now " + Math.ceil(newHealth) + "%");
+		}
 	}
 
-	/** A contact ended between two fixtures */
-	private void onEndContact(Contact contact) {
-		// PhysicalState obj1 = (PhysicalState) contact.getFixtureA().getUserData();
-		// PhysicalState obj2 = (PhysicalState) contact.getFixtureB().getUserData();
-		// System.out.println("End contact between " + obj1.getName() + " and " + obj2.getName());
+	private void onPlayerDeath() {
+		// TODO End game...
+		soundManager.playEffect(this.gameOver);
+	}
+
+	private void onEnemyDeath(Enemy entity) {
+		// TODO Transform this to a non-moving element (like walls); do not dead damages anymore
+		soundManager.playEffect(this.enemyKill);
 	}
 
 	public static void main(String[] args) {
