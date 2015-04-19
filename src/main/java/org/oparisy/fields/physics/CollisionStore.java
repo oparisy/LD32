@@ -1,4 +1,4 @@
-package org.oparisy.fields;
+package org.oparisy.fields.physics;
 
 import java.util.HashMap;
 import java.util.Map;

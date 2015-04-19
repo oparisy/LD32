@@ -1,4 +1,4 @@
-package org.oparisy.fields;
+package org.oparisy.fields.render;
 
 import org.lwjgl.util.vector.Matrix4f;
 import org.lwjgl.util.vector.Vector3f;

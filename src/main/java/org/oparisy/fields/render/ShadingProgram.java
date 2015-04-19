@@ -1,4 +1,4 @@
-package org.oparisy.fields;
+package org.oparisy.fields.render;
 
 import static org.lwjgl.opengl.GL11.GL_FLOAT;
 import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
@@ -26,8 +26,8 @@ import org.oparisy.fields.tools.common.Tools;
 /** Wrap the OpenGL shading program */
 public class ShadingProgram {
 
-	private static final String vertexShaderFile = "fields/StandardShading.vertexshader";
-	private static final String fragmentShaderFile = "fields/StandardShading.fragmentshader";
+	private static final String vertexShaderFile = "fields/StandardShading.vs";
+	private static final String fragmentShaderFile = "fields/StandardShading.fs";
 
 	private int program;
 
@@ -43,7 +43,7 @@ public class ShadingProgram {
 	private int uvID;
 	private int normalID;
 
-	public ShadingProgram() throws Exception, Error {
+	public ShadingProgram() throws Exception {
 		int vs = Tools.makeShader(GL_VERTEX_SHADER, vertexShaderFile);
 		int fs = Tools.makeShader(GL_FRAGMENT_SHADER, fragmentShaderFile);
 		program = Tools.makeProgram(vs, fs);

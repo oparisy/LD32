@@ -1,4 +1,4 @@
-package org.oparisy.fields;
+package org.oparisy.fields.physics;
 
 /** Represent an element of the game (player, wall...) */
 public abstract class GameEntity {

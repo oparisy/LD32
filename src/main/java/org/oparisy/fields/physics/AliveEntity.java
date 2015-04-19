@@ -1,4 +1,4 @@
-package org.oparisy.fields;
+package org.oparisy.fields.physics;
 
 public class AliveEntity extends GameEntity {
 	

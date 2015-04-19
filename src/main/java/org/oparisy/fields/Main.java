@@ -43,13 +43,29 @@ import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Controller;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
+import org.lwjgl.opengl.ARBDebugOutput;
+import org.lwjgl.opengl.ARBDebugOutputCallback;
+import org.lwjgl.opengl.ContextAttribs;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
 import org.lwjgl.opengl.PixelFormat;
 import org.lwjgl.util.vector.Matrix4f;
 import org.lwjgl.util.vector.Vector3f;
+import org.oparisy.fields.physics.AliveEntity;
+import org.oparisy.fields.physics.Box;
+import org.oparisy.fields.physics.CollisionStore;
+import org.oparisy.fields.physics.Enemy;
+import org.oparisy.fields.physics.GameEntity;
+import org.oparisy.fields.physics.PhysicalState;
+import org.oparisy.fields.physics.Player;
+import org.oparisy.fields.physics.Wall;
+import org.oparisy.fields.render.Camera;
+import org.oparisy.fields.render.OpenGLMesh;
+import org.oparisy.fields.render.OverlayProgram;
+import org.oparisy.fields.render.ShadingProgram;
 import org.oparisy.fields.tools.audio.SoundManager;
 import org.oparisy.fields.tools.common.ControllerSetup;
+import org.oparisy.fields.tools.common.MessageHandler;
 import org.oparisy.fields.tools.common.Tools;
 
 public class Main {
@@ -83,7 +99,7 @@ public class Main {
 	private static final int SCREEN_WIDTH = 1024;
 
 	// Resources (shader sources) location
-	private static final String RES = "fields"; // Main.class.getPackage().getName().replace(".", "/");
+	// private static final String RES = "fields"; // Main.class.getPackage().getName().replace(".", "/");
 
 	private int texture;
 
@@ -111,6 +127,7 @@ public class Main {
 	private List<Matrix4f> enemiesMatrix = new ArrayList<Matrix4f>();
 
 	private ShadingProgram shadingProgram;
+	private OverlayProgram overlayProgram;
 
 	private org.oparisy.fields.tools.audio.SoundManager soundManager;
 
@@ -126,7 +143,11 @@ public class Main {
 
 	private int collision;
 
-	public int uploadTexture(BufferedImage img) {
+	//private int font;
+
+	private Matrix4f overlayMatrix;
+
+	public static int uploadTexture(BufferedImage img) {
 		img = Tools.flipVertically(img);
 		ByteBuffer pixels = Tools.imageToByteBuffer(img);
 
@@ -187,29 +208,37 @@ public class Main {
 		DisplayMode mode = new DisplayMode(SCREEN_WIDTH, SCREEN_HEIGHT);
 		Display.setDisplayMode(mode);
 		Display.setTitle(this.getClass().getSimpleName());
+
+		// Set up ARB_debug_output (requires a debug context)
 		PixelFormat pixelFormat = new PixelFormat().withSamples(4); // 4x antialiasing
-		Display.create(pixelFormat);
+		ContextAttribs contextAttributes = new ContextAttribs(3, 3).withDebug(true).withProfileCompatibility(true);
+		Display.create(pixelFormat, contextAttributes);
+		ARBDebugOutput.glDebugMessageCallbackARB(new ARBDebugOutputCallback(new MessageHandler()));
 
 		System.out.println("GL version: " + glGetString(GL_VERSION));
 
 		// Load resources
-		BufferedImage img = ImageIO.read(Tools.loadResource(RES + "/uvmap.png"));
+		BufferedImage img = ImageIO.read(Tools.loadResource("fields/uvmap.png"));
+		BufferedImage fontImg = ImageIO.read(Tools.loadResource("fields/font.png"));
 
-		playerMesh = new OpenGLMesh(Tools.loadResource(RES + "/suzanne.obj"));
-		boxMesh = new OpenGLMesh(Tools.loadResource(RES + "/boxuv.obj"));
-		enemyMesh = new OpenGLMesh(Tools.loadResource(RES + "/enemy.obj"));
+		playerMesh = new OpenGLMesh(Tools.loadResource("fields/suzanne.obj"));
+		boxMesh = new OpenGLMesh(Tools.loadResource("fields/boxuv.obj"));
+		enemyMesh = new OpenGLMesh(Tools.loadResource("fields/enemy.obj"));
 
+		// Create a VAO to store buffers configuration
+		// Required in OpenGL 3 (or not. But do not do this twice, it will crash!)
+		glBindVertexArray(glGenVertexArrays());
+		
 		shadingProgram = new ShadingProgram();
-
-		// Required in OpenGL 3
-		int vao = glGenVertexArrays();
-		glBindVertexArray(vao);
 
 		// Upload data to GPU
 		playerMesh.uploadToGPU();
 		boxMesh.uploadToGPU();
 		enemyMesh.uploadToGPU();
 		texture = uploadTexture(img);
+		//font = uploadTexture(fontImg);
+		
+		overlayProgram = new OverlayProgram();
 
 		// Global OpenGL setup
 		glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
@@ -405,20 +434,28 @@ public class Main {
 		this.viewMatrix = camera.getMatrix();
 
 		this.vpMatrix = Matrix4f.mul(projectionMatrix, viewMatrix, null);
+
+		// Set up projection matrix (will not change until next resize)
+		// Identity view matrix (2D projection)
+		overlayMatrix = Tools.glOrtho(0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 1, -1);
 	}
 
 	private void render() {
-
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		renderEntities();
+		renderOverlay();
+	}
 
+	private void renderEntities() {
 		shadingProgram.use();
 		shadingProgram.setViewMatrix(viewMatrix);
-		shadingProgram.setLightPos(lightPos);
-		shadingProgram.bindTexture(texture);
-
+		
+				shadingProgram.setLightPos(lightPos);
+				shadingProgram.bindTexture(texture);
+				
 		// Prepare program for buffers binding
 		shadingProgram.enableVertexAttribArrays();
-
+		
 		// Render player
 		shadingProgram.bindMeshBuffers(playerMesh);
 		{
@@ -448,6 +485,16 @@ public class Main {
 		}
 
 		shadingProgram.disableVertexAttribArrays();
+	}
+
+	private void renderOverlay() {
+		overlayProgram.use();
+		overlayProgram.setProjectionMatrix(overlayMatrix);
+		overlayProgram.bindTexture();
+		overlayProgram.enableVertexAttribArrays();
+		overlayProgram.bindBuffers();
+		overlayProgram.drawText(0, 0, "Hello world");
+		overlayProgram.disableVertexAttribArrays();
 	}
 
 	private void runOneSimulationStep() {

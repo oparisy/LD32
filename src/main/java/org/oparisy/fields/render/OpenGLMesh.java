@@ -1,4 +1,4 @@
-package org.oparisy.fields;
+package org.oparisy.fields.render;
 
 import static org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER;
 import static org.lwjgl.opengl.GL15.GL_STATIC_DRAW;
@@ -8,6 +8,7 @@ import static org.lwjgl.opengl.GL15.glGenBuffers;
 
 import java.io.InputStream;
 
+import org.oparisy.fields.tools.common.NonIndexedOBJLoader;
 import org.oparisy.fields.tools.common.Tools;
 
 /** A mesh, as uploaded to the GPU */
@@ -19,7 +20,7 @@ public class OpenGLMesh {
 	private int normalBuffer;
 	private NonIndexedOBJLoader loader;
 
-	OpenGLMesh(InputStream obj) throws Exception {
+	public OpenGLMesh(InputStream obj) throws Exception {
 		loader = new NonIndexedOBJLoader();
 		loader.loadObj(obj);
 		triangleCount = loader.getFaceCount();

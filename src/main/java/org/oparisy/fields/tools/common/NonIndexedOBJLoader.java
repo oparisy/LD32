@@ -1,10 +1,9 @@
-package org.oparisy.fields;
+package org.oparisy.fields.tools.common;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.ArrayUtils;
-import org.oparisy.fields.tools.common.OBJLoader;
 
 public class NonIndexedOBJLoader extends OBJLoader {
 

@@ -1,4 +1,4 @@
-package org.oparisy.fields;
+package org.oparisy.fields.physics;
 
 import org.jbox2d.collision.shapes.PolygonShape;
 import org.jbox2d.dynamics.BodyType;
