@@ -39,6 +39,7 @@ import javax.imageio.ImageIO;
 import org.lwjgl.opengl.Util;
 import org.lwjgl.util.vector.Matrix4f;
 import org.lwjgl.util.vector.Vector2f;
+import org.lwjgl.util.vector.Vector3f;
 import org.oparisy.fields.tools.common.Tools;
 
 public class OverlayProgram {
@@ -148,14 +149,14 @@ public class OverlayProgram {
 		glDisableVertexAttribArray(uvID);
 	}
 
-	public void drawText(int x, int y, String string) {
+	public void drawText(int x, int y, String string, float scale) {
 		for (int chr : string.toUpperCase().toCharArray()) {
 			if (chr != 32) {
 				glUniform1i(asciiID, chr);
-				glUniformMatrix4(charPosID, false, Tools.buildFloatBuffer(new Matrix4f().translate(new Vector2f(x, y))));
+				glUniformMatrix4(charPosID, false, Tools.buildFloatBuffer(new Matrix4f().translate(new Vector2f(x, y)).scale(new Vector3f(scale,scale,scale))));
 				glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 			}
-			x += (FONT_WIDTH + CHAR_HORIZONTAL_MARGIN) * SCALE;
+			x += (FONT_WIDTH + CHAR_HORIZONTAL_MARGIN) * SCALE* scale;
 		}
 	}
 	

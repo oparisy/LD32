@@ -12,6 +12,7 @@ import static org.lwjgl.opengl.GL11.GL_TEXTURE_MIN_FILTER;
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
 import static org.lwjgl.opengl.GL11.GL_VERSION;
+import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL11.glBindTexture;
 import static org.lwjgl.opengl.GL11.glClear;
 import static org.lwjgl.opengl.GL11.glClearColor;
@@ -70,7 +71,7 @@ import org.oparisy.fields.tools.common.Tools;
 
 public class Main {
 
-	private static final int BOX_NB = 2;
+	private static final int BOX_NB = 5;
 
 	private static final int WALL_BOTTOM = 5;
 
@@ -81,6 +82,8 @@ public class Main {
 	private static final int WALL_LEFT = -9;
 
 	private static final float WALL_WIDTH = 0.5f;
+
+	private static final float PLAYER_RADIUS = 0.5f;
 
 	/* Beyond this distance, player does not exerce a force */
 	private static final double MAX_PLAYER_INFLUENCE = 10;
@@ -95,8 +98,14 @@ public class Main {
 	private static final float ZNEAR = 0.1f;
 	private static final float ZFAR = 100f;
 
-	private static final int SCREEN_HEIGHT = 768;
-	private static final int SCREEN_WIDTH = 1024;
+	boolean fullScreen = true;
+	private boolean vsync = true;
+
+	private static final int WINDOWED_SCREEN_WIDTH = 1024;
+	private static final int WINDOWED_SCREEN_HEIGHT = 768;
+
+	private int SCREEN_WIDTH;
+	private int SCREEN_HEIGHT;
 
 	// Resources (shader sources) location
 	// private static final String RES = "fields"; // Main.class.getPackage().getName().replace(".", "/");
@@ -143,9 +152,17 @@ public class Main {
 
 	private int collision;
 
-	//private int font;
+	// private int font;
 
 	private Matrix4f overlayMatrix;
+
+	private CollisionStore collisionStore = new CollisionStore();
+
+	private boolean playerLost = false;
+	private boolean playerWon = false;
+	private double score = 0;
+
+	private double elapsedSec;
 
 	public static int uploadTexture(BufferedImage img) {
 		img = Tools.flipVertically(img);
@@ -205,8 +222,8 @@ public class Main {
 	}
 
 	private void setupRender() throws LWJGLException, IOException, Error, Exception {
-		DisplayMode mode = new DisplayMode(SCREEN_WIDTH, SCREEN_HEIGHT);
-		Display.setDisplayMode(mode);
+
+		setDisplayMode();
 		Display.setTitle(this.getClass().getSimpleName());
 
 		// Set up ARB_debug_output (requires a debug context)
@@ -228,7 +245,7 @@ public class Main {
 		// Create a VAO to store buffers configuration
 		// Required in OpenGL 3 (or not. But do not do this twice, it will crash!)
 		glBindVertexArray(glGenVertexArrays());
-		
+
 		shadingProgram = new ShadingProgram();
 
 		// Upload data to GPU
@@ -236,8 +253,8 @@ public class Main {
 		boxMesh.uploadToGPU();
 		enemyMesh.uploadToGPU();
 		texture = uploadTexture(img);
-		//font = uploadTexture(fontImg);
-		
+		// font = uploadTexture(fontImg);
+
 		overlayProgram = new OverlayProgram();
 
 		// Global OpenGL setup
@@ -245,6 +262,21 @@ public class Main {
 		glEnable(GL_DEPTH_TEST);
 		glDepthFunc(GL_LESS);
 		// glEnable(GL_CULL_FACE);
+	}
+
+	/** Set display mode, taking fullscreen into acocunt */
+	private void setDisplayMode() {
+		if (fullScreen) {
+			SCREEN_WIDTH = 1920;
+			SCREEN_HEIGHT = 1080;
+		} else {
+			SCREEN_WIDTH = WINDOWED_SCREEN_WIDTH;
+			SCREEN_HEIGHT = WINDOWED_SCREEN_HEIGHT;
+		}
+
+		Tools.setDisplayMode(SCREEN_WIDTH, SCREEN_HEIGHT, fullScreen);
+		// DisplayMode mode = new DisplayMode(SCREEN_WIDTH, SCREEN_HEIGHT);
+		// Display.setDisplayMode(mode);
 	}
 
 	public void mainLoop() {
@@ -261,7 +293,7 @@ public class Main {
 
 			// Get environment informations
 			double sec = Tools.getTimeSeconds();
-			double elapsedSec = sec - lastTime;
+			elapsedSec = sec - lastTime;
 			this.lastTime = sec;
 
 			int dx = -Mouse.getDX();
@@ -287,6 +319,18 @@ public class Main {
 
 			quit = Keyboard.isKeyDown(Keyboard.KEY_Q) || Keyboard.isKeyDown(Keyboard.KEY_ESCAPE);
 
+			while (Keyboard.next()) {
+				if (Keyboard.getEventKeyState()) {
+					if (Keyboard.getEventKey() == Keyboard.KEY_F) {
+						fullScreen = !fullScreen;
+						setDisplayMode();
+					} else if (Keyboard.getEventKey() == Keyboard.KEY_V) {
+						vsync = !vsync;
+						Display.setVSyncEnabled(vsync);
+					}
+				}
+			}
+
 			if (controller != null && ControllerSetup.isControllerInitialised()) {
 
 				// StringBuilder sb = new StringBuilder();
@@ -304,14 +348,16 @@ public class Main {
 				// TODO Take player size into account
 				Vec2 playerDeltaPos = new Vec2(x / 20f, y / 20f);
 				Vec2 newPos = player.getState().getPosition().add(playerDeltaPos);
-				if (newPos.x < WALL_LEFT + WALL_WIDTH || newPos.x > WALL_RIGHT - WALL_WIDTH) {
+				if (newPos.x - PLAYER_RADIUS < WALL_LEFT + WALL_WIDTH || newPos.x + PLAYER_RADIUS > WALL_RIGHT - WALL_WIDTH) {
 					playerDeltaPos.x = 0;
 				}
-				if (newPos.y < WALL_TOP + WALL_WIDTH || newPos.y > WALL_BOTTOM - WALL_WIDTH) {
+				if (newPos.y - PLAYER_RADIUS < WALL_TOP + WALL_WIDTH || newPos.y + PLAYER_RADIUS > WALL_BOTTOM - WALL_WIDTH) {
 					playerDeltaPos.y = 0;
 				}
 
-				player.getState().addToPos(playerDeltaPos);
+				if (!playerWon && !playerLost) {
+					player.getState().addToPos(playerDeltaPos);
+				}
 
 				if (controller.isButtonPressed(0) || controller.isButtonPressed(1)) {
 					for (Box box : this.physicalBox) {
@@ -342,7 +388,9 @@ public class Main {
 				}
 			}
 
-			runOneSimulationStep();
+			if (!playerWon && !playerLost) {
+				runOneSimulationStep();
+			}
 
 			runIA();
 
@@ -367,6 +415,10 @@ public class Main {
 				elapsedSinceLastFPS -= 1;
 				Display.setTitle(this.getClass().getSimpleName() + " - " + fps + " FPS");
 				fps = 0;
+			}
+
+			if (!playerWon && !playerLost) {
+				score += elapsedSec * 100;
 			}
 		}
 	}
@@ -449,18 +501,25 @@ public class Main {
 	private void renderEntities() {
 		shadingProgram.use();
 		shadingProgram.setViewMatrix(viewMatrix);
-		
-				shadingProgram.setLightPos(lightPos);
-				shadingProgram.bindTexture(texture);
-				
+
+		shadingProgram.setLightPos(lightPos);
+		shadingProgram.bindTexture(texture);
+
 		// Prepare program for buffers binding
 		shadingProgram.enableVertexAttribArrays();
-		
+
 		// Render player
+		if (playerLost) {
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_ONE, GL_ONE);
+		}
 		shadingProgram.bindMeshBuffers(playerMesh);
 		{
 			shadingProgram.updateMVPMatrix(vpMatrix, playerMatrix);
 			glDrawArrays(GL_TRIANGLES, 0, playerMesh.getTriangleCount() * 3);
+		}
+		if (playerLost) {
+			glDisable(GL_BLEND);
 		}
 
 		// Render boxes
@@ -478,23 +537,46 @@ public class Main {
 		}
 
 		// Render enemies
+		if (playerWon) {
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_ONE, GL_ONE);
+		}
 		shadingProgram.bindMeshBuffers(enemyMesh);
 		for (Matrix4f enemy : enemiesMatrix) {
 			shadingProgram.updateMVPMatrix(vpMatrix, enemy);
 			glDrawArrays(GL_TRIANGLES, 0, enemyMesh.getTriangleCount() * 3);
+		}
+		if (playerWon) {
+			glDisable(GL_BLEND);
 		}
 
 		shadingProgram.disableVertexAttribArrays();
 	}
 
 	private void renderOverlay() {
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_ONE, GL_ONE);
 		overlayProgram.use();
 		overlayProgram.setProjectionMatrix(overlayMatrix);
 		overlayProgram.bindTexture();
 		overlayProgram.enableVertexAttribArrays();
 		overlayProgram.bindBuffers();
-		overlayProgram.drawText(0, 0, "Hello world");
+		overlayProgram.drawText(4, 04, "Player Health " + String.format("%d", (int) player.getHealth()), 2);
+		overlayProgram.drawText(4, 28, "Enemy Health  " + String.format("%d", (int) enemies.get(0).getHealth()), 2);
+		overlayProgram.drawText(4, 52, "Score         " + String.format("%d", (int) score), 2);
+
+		if (playerWon || playerLost) {
+			String message = playerWon ? "You won" : "You lost";
+
+			Matrix4f wooble = new Matrix4f();
+			wooble.rotate((float) (15. * Math.PI / 180.), new Vector3f(0, 0, 1));
+
+			overlayProgram.setProjectionMatrix(Matrix4f.mul(overlayMatrix, wooble, null));
+			overlayProgram.drawText(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 4, message, 3);
+		}
+
 		overlayProgram.disableVertexAttribArrays();
+		glDisable(GL_BLEND);
 	}
 
 	private void runOneSimulationStep() {
@@ -551,7 +633,9 @@ public class Main {
 			}
 
 			public void postSolve(Contact contact, ContactImpulse impulse) {
-				onPostSolve(contact, impulse);
+				if (!playerWon && !playerLost) {
+					onPostSolve(contact, impulse);
+				}
 			}
 
 			public void beginContact(Contact contact) {
@@ -561,8 +645,6 @@ public class Main {
 			}
 		});
 	}
-
-	private CollisionStore collisionStore = new CollisionStore();
 
 	/**
 	 * A contact occured. This method provide "collision strength" informations, see
@@ -628,7 +710,7 @@ public class Main {
 				soundManager.playEffect(this.weeUup);
 			}
 
-			dealDamage((Enemy) e2, force * 2f);
+			dealDamage((Enemy) e2, force * 4f);
 			return;
 		}
 
@@ -644,6 +726,11 @@ public class Main {
 	}
 
 	private void dealDamage(AliveEntity entity, float damage) {
+
+		if (entity instanceof Enemy) {
+			score += damage * damage * 1000;
+		}
+
 		float newHealth = entity.getHealth() - damage;
 		entity.setHealth(newHealth);
 		if (newHealth < 0) {
@@ -660,13 +747,15 @@ public class Main {
 	}
 
 	private void onPlayerDeath() {
-		// TODO End game...
+		player.setHealth(0);
 		soundManager.playEffect(this.gameOver);
+		playerLost = true;
 	}
 
 	private void onEnemyDeath(Enemy entity) {
-		// TODO Transform this to a non-moving element (like walls); do not dead damages anymore
+		entity.setHealth(0);
 		soundManager.playEffect(this.enemyKill);
+		playerWon = true;
 	}
 
 	public static void main(String[] args) {

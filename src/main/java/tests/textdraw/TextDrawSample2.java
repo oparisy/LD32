@@ -111,7 +111,7 @@ public class TextDrawSample2 {
 
 		overlayProgram.enableVertexAttribArrays();
 		overlayProgram.bindBuffers();
-		overlayProgram.drawText(0, 0, "Hello World");
+		overlayProgram.drawText(0, 0, "Hello World", 1);
 
 		// TODO Are those needed here?
 		// glDisableVertexAttribArray(posID);

@@ -2,8 +2,8 @@
 
 #define CHAR_WIDTH 5.
 #define CHAR_HORIZONTAL_MARGIN 1.
-#define FONT_MAP_WIDTH 256.
-#define A_ASCII_VALUE 65.
+#define FONT_MAP_WIDTH 512.
+#define INIT_ASCII_VALUE 48.
 
 // Interpolated values from the vertex shaders
 in vec3 fragmentColor;
@@ -19,15 +19,14 @@ void main(){
 
 	// Second term: ensure only one character is mapped, swap Y axis
 	// Third term: offset to the proper character
-	float xOffset = (ascii - A_ASCII_VALUE) * (CHAR_WIDTH + CHAR_HORIZONTAL_MARGIN);
+	float xOffset = (ascii - INIT_ASCII_VALUE) * (CHAR_WIDTH + CHAR_HORIZONTAL_MARGIN);
 	vec2 texCoord = UV * vec2(CHAR_WIDTH / FONT_MAP_WIDTH, -1) + vec2(xOffset / FONT_MAP_WIDTH, 0);
 	vec3 texColor = texture2D(myTextureSampler, texCoord).rgb;
 	if (texColor.r == 0) {
 		// Black pixel in texture => white pixel on screen
-		color = vec4(1,1,1,1);
+		color = vec4(1,1,1,0);
 	} else {
 		// Transparent pixel
-		color = vec4(0,0,0,0);
-	}
-	//color = fragmentColor * 
+		color = vec4(0,0,0,1);
+	} 
 }

@@ -25,3 +25,5 @@ Dimanche :
 16h15 : collisions joueur / ennemi détectées
 17h00 : calcul dégâts, détection morts
 21h00 : shader d'écriture de texte en overlay écrit et intégré
+21h15 -> 22h45 : repas
+00h15 : gameplay, évènements perdu / gagné, affichage vie, score, fullscreen, vsync
