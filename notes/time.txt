@@ -24,3 +24,4 @@ Dimanche :
 15h15 : sons joués proprement sur les différents types de collisions
 16h15 : collisions joueur / ennemi détectées
 17h00 : calcul dégâts, détection morts
+21h00 : shader d'écriture de texte en overlay écrit et intégré
