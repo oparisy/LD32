@@ -342,6 +342,10 @@ public class Main {
 				}
 			}
 
+			float x = 0, y = 0;
+			boolean attraction = false;
+			boolean repulsion = false;
+
 			if (controller != null && ControllerSetup.isControllerInitialised()) {
 
 				// StringBuilder sb = new StringBuilder();
@@ -351,50 +355,74 @@ public class Main {
 				// System.out.println(sb.toString());
 
 				// XBox 360 mappings?
-				float x = controller.getAxisValue(1);
-				float y = -controller.getAxisValue(0);
-				// System.out.println("x: " + x + " y: " + y);
+				x = controller.getAxisValue(1);
+				y = -controller.getAxisValue(0);
 
-				// Detect collisions with borders (walls)
-				// TODO Take player size into account
-				Vec2 playerDeltaPos = new Vec2(x / 20f, y / 20f);
-				Vec2 newPos = player.getState().getPosition().add(playerDeltaPos);
-				if (newPos.x - PLAYER_RADIUS < WALL_LEFT + WALL_WIDTH || newPos.x + PLAYER_RADIUS > WALL_RIGHT - WALL_WIDTH) {
-					playerDeltaPos.x = 0;
-				}
-				if (newPos.y - PLAYER_RADIUS < WALL_TOP + WALL_WIDTH || newPos.y + PLAYER_RADIUS > WALL_BOTTOM - WALL_WIDTH) {
-					playerDeltaPos.y = 0;
-				}
+				attraction = controller.isButtonPressed(0);
+				repulsion = controller.isButtonPressed(1);
+			}
 
-				if (!playerWon && !playerLost) {
-					player.getState().addToPos(playerDeltaPos);
-				}
+			if (Keyboard.isKeyDown(Keyboard.KEY_W)) {
+				y = 1;
+			}
 
-				if (controller.isButtonPressed(0) || controller.isButtonPressed(1)) {
-					for (Box box : this.physicalBox) {
-						PhysicalState physicalBox = box.getState();
+			if (Keyboard.isKeyDown(Keyboard.KEY_S)) {
+				y = -1;
+			}
 
-						// Compute vector from box to player
-						Vec2 delta = physicalBox.getPosition().sub(player.getState().getPosition());
+			if (Keyboard.isKeyDown(Keyboard.KEY_A)) {
+				x = -1;
+			}
 
-						// Compute an attraction force
-						float coef = 0.3f;
-						float len = (float) delta.length();
-						if (len > MAX_PLAYER_INFLUENCE) {
-							coef /= 0.03f;
+			if (Keyboard.isKeyDown(Keyboard.KEY_D)) {
+				x = 1;
+			}
+			
+			if (Keyboard.isKeyDown(Keyboard.KEY_SPACE)) {
+				attraction = true;
+			}
+
+			// System.out.println("x: " + x + " y: " + y);
+
+			// Detect collisions with borders (walls)
+			// TODO Take player size into account
+			Vec2 playerDeltaPos = new Vec2(x / 20f, y / 20f);
+			Vec2 newPos = player.getState().getPosition().add(playerDeltaPos);
+			if (newPos.x - PLAYER_RADIUS < WALL_LEFT + WALL_WIDTH || newPos.x + PLAYER_RADIUS > WALL_RIGHT - WALL_WIDTH) {
+				playerDeltaPos.x = 0;
+			}
+			if (newPos.y - PLAYER_RADIUS < WALL_TOP + WALL_WIDTH || newPos.y + PLAYER_RADIUS > WALL_BOTTOM - WALL_WIDTH) {
+				playerDeltaPos.y = 0;
+			}
+
+			if (!playerWon && !playerLost) {
+				player.getState().addToPos(playerDeltaPos);
+			}
+
+			if (attraction || repulsion) {
+				for (Box box : this.physicalBox) {
+					PhysicalState physicalBox = box.getState();
+
+					// Compute vector from box to player
+					Vec2 delta = physicalBox.getPosition().sub(player.getState().getPosition());
+
+					// Compute an attraction force
+					float coef = 0.3f;
+					float len = (float) delta.length();
+					if (len > MAX_PLAYER_INFLUENCE) {
+						coef /= 0.03f;
+					}
+
+					if (len > 0.02f) {
+						// Divided by len => unit vector, then by len => inverse of distance
+						Vec2 force = delta.negate().mul(coef / (len * len));
+
+						if (repulsion) {
+							// Repulsive force
+							force = force.negate();
 						}
 
-						if (len > 0.02f) {
-							// Divided by len => unit vector, then by len => inverse of distance
-							Vec2 force = delta.negate().mul(coef / (len * len));
-
-							if (controller.isButtonPressed(1)) {
-								// Repulsive force
-								force = force.negate();
-							}
-
-							physicalBox.applyForce(force, physicalBox.getPosition());
-						}
+						physicalBox.applyForce(force, physicalBox.getPosition());
 					}
 				}
 			}
@@ -477,7 +505,7 @@ public class Main {
 			Matrix4f boxMatrix = new Matrix4f();
 			boxMatrix.translate(new Vector3f(physicalBox.getPosition().x, physicalBox.getPosition().y, 0));
 			boxMatrix.scale(new Vector3f(0.25f, 0.25f, 0.25f));
-			boxMatrix.rotate(physicalBox.getAngle(), new Vector3f(0,0,1));
+			boxMatrix.rotate(physicalBox.getAngle(), new Vector3f(0, 0, 1));
 
 			boxesMatrix.add(boxMatrix);
 		}
@@ -541,7 +569,7 @@ public class Main {
 			shadingProgram.updateMVPMatrix(vpMatrix, boxMatrix);
 			glDrawArrays(GL_TRIANGLES, 0, wrenchMesh.getTriangleCount() * 3);
 		}
-		
+
 		shadingProgram.bindTexture(defaultTexture);
 
 		// Render walls
@@ -629,7 +657,7 @@ public class Main {
 
 	private void createPhysicalBox() {
 		for (int i = 0; i < BOX_NB; i++) {
-			physicalBox.add(new Box(5 - i*1.5f, 5, world, "Box#" + i));
+			physicalBox.add(new Box(5 - i * 1.5f, 5, world, "Box#" + i));
 		}
 	}
 
