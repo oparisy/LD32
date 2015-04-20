@@ -1,0 +1,32 @@
+Press space or A button to begin playing or read on
+
+
+
+welcome to Magnetic Fields
+
+
+
+In this game you will defend against an enemy by using an unconventional weapon
+
+That weapon is magnetic fields
+
+OK I basically did not draw punctuation signs in this font hence the disrupted sentences
+
+Anyway please connect an XBox pad for best experience
+
+Use the stick to move, A to emit magnetic field
+
+Oh I added WSAD and space support too
+
+Now go try to get a highscore
+
+
+Press space or button A to begin
+
+
+
+
+
+Thanks for Shiro Games for hosting me for my first Ludum Dare Compo
+
+Copyright oparisy 2015

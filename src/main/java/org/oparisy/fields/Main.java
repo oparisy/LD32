@@ -1,28 +1,6 @@
 package org.oparisy.fields;
 
-import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
-import static org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT;
-import static org.lwjgl.opengl.GL11.GL_DEPTH_TEST;
-import static org.lwjgl.opengl.GL11.GL_LESS;
-import static org.lwjgl.opengl.GL11.GL_LINEAR;
-import static org.lwjgl.opengl.GL11.GL_RGB;
-import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
-import static org.lwjgl.opengl.GL11.GL_TEXTURE_MAG_FILTER;
-import static org.lwjgl.opengl.GL11.GL_TEXTURE_MIN_FILTER;
-import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
-import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
-import static org.lwjgl.opengl.GL11.GL_VERSION;
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL11.glBindTexture;
-import static org.lwjgl.opengl.GL11.glClear;
-import static org.lwjgl.opengl.GL11.glClearColor;
-import static org.lwjgl.opengl.GL11.glDepthFunc;
-import static org.lwjgl.opengl.GL11.glDrawArrays;
-import static org.lwjgl.opengl.GL11.glEnable;
-import static org.lwjgl.opengl.GL11.glGenTextures;
-import static org.lwjgl.opengl.GL11.glGetString;
-import static org.lwjgl.opengl.GL11.glTexImage2D;
-import static org.lwjgl.opengl.GL11.glTexParameteri;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL30.glGenVertexArrays;
 
@@ -34,6 +12,7 @@ import java.util.List;
 
 import javax.imageio.ImageIO;
 
+import org.apache.commons.io.IOUtils;
 import org.jbox2d.callbacks.ContactImpulse;
 import org.jbox2d.callbacks.ContactListener;
 import org.jbox2d.collision.Manifold;
@@ -98,7 +77,7 @@ public class Main {
 	private static final float ZNEAR = 0.1f;
 	private static final float ZFAR = 100f;
 
-	boolean fullScreen = false;
+	boolean fullScreen = true;
 	private boolean vsync = true;
 
 	private static final int WINDOWED_SCREEN_WIDTH = 1024;
@@ -170,6 +149,8 @@ public class Main {
 
 	private OpenGLMesh wrenchMesh;
 
+	private List<String> homeText;
+
 	public static int uploadTexture(BufferedImage img) {
 		img = Tools.flipVertically(img);
 		ByteBuffer pixels = Tools.imageToByteBuffer(img);
@@ -194,15 +175,55 @@ public class Main {
 		setupSound();
 		setupRender();
 
+		System.out.println("Waiting for keypress");
+
+		updateOverlayMatrix();
+
+		Mouse.setGrabbed(true);
+		detectController();
+
+		glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
+		while (!Display.isCloseRequested()) {
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			renderHome();
+			Display.update();
+
+			if (Keyboard.isKeyDown(Keyboard.KEY_SPACE)
+					|| (controller != null && ControllerSetup.isControllerInitialised() && controller.isButtonPressed(0))) {
+				break;
+			}
+		}
+		glClearColor(0.0f, 0.1f, 0.2f, 0.0f);
+
 		setupPhysics();
 		setupPhysicalEntities();
 
+		// Perhaps it was plugged after reading home screen
 		detectController();
 
 		mainLoop();
 
 		Display.destroy();
 		soundManager.destroy();
+	}
+
+	private void renderHome() {
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_ONE, GL_ONE);
+		overlayProgram.use();
+		overlayProgram.setProjectionMatrix(overlayMatrix);
+		overlayProgram.bindTexture();
+		overlayProgram.enableVertexAttribArrays();
+		overlayProgram.bindBuffers();
+
+		int y = 4;
+		for (String line : homeText) {
+			overlayProgram.drawText(4, y, line, 1.2f);
+			y += 24;
+		}
+
+		overlayProgram.disableVertexAttribArrays();
+		glDisable(GL_BLEND);
 	}
 
 	private void setupSound() {
@@ -250,6 +271,8 @@ public class Main {
 		boxMesh = new OpenGLMesh(Tools.loadResource("fields/boxuv.obj"));
 		enemyMesh = new OpenGLMesh(Tools.loadResource("fields/enemy.obj"));
 
+		homeText = IOUtils.readLines(Tools.loadResource("fields/home.txt"));
+
 		// Create a VAO to store buffers configuration
 		// Required in OpenGL 3 (or not. But do not do this twice, it will crash!)
 		glBindVertexArray(glGenVertexArrays());
@@ -269,7 +292,6 @@ public class Main {
 		overlayProgram = new OverlayProgram();
 
 		// Global OpenGL setup
-		glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
 		glEnable(GL_DEPTH_TEST);
 		glDepthFunc(GL_LESS);
 		// glEnable(GL_CULL_FACE);
@@ -377,7 +399,7 @@ public class Main {
 			if (Keyboard.isKeyDown(Keyboard.KEY_D)) {
 				x = 1;
 			}
-			
+
 			if (Keyboard.isKeyDown(Keyboard.KEY_SPACE)) {
 				attraction = true;
 			}
@@ -527,6 +549,10 @@ public class Main {
 
 		this.vpMatrix = Matrix4f.mul(projectionMatrix, viewMatrix, null);
 
+		updateOverlayMatrix();
+	}
+
+	private void updateOverlayMatrix() {
 		// Set up projection matrix (will not change until next resize)
 		// Identity view matrix (2D projection)
 		overlayMatrix = Tools.glOrtho(0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 1, -1);
@@ -536,6 +562,7 @@ public class Main {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		renderEntities();
 		renderOverlay();
+		// renderHome();
 	}
 
 	private void renderEntities() {
