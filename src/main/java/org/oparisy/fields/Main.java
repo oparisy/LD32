@@ -325,13 +325,15 @@ public class Main {
 	private void setDisplayMode() {
 		if (fullScreen) {
 			SCREEN_WIDTH = 1920;
-			SCREEN_HEIGHT = 1080;
+			SCREEN_HEIGHT = -1;
 		} else {
 			SCREEN_WIDTH = WINDOWED_SCREEN_WIDTH;
 			SCREEN_HEIGHT = WINDOWED_SCREEN_HEIGHT;
 		}
 
 		Tools.setDisplayMode(SCREEN_WIDTH, SCREEN_HEIGHT, fullScreen);
+		SCREEN_WIDTH = Display.getDisplayMode().getWidth();
+		SCREEN_HEIGHT = Display.getDesktopDisplayMode().getHeight();
 		// DisplayMode mode = new DisplayMode(SCREEN_WIDTH, SCREEN_HEIGHT);
 		// Display.setDisplayMode(mode);
 	}
@@ -836,7 +838,7 @@ public class Main {
 				onPlayerDeath();
 			}
 		} else {
-			System.out.println(entity.getName() + " health is now " + Math.ceil(newHealth) + "%");
+			// System.out.println(entity.getName() + " health is now " + Math.ceil(newHealth) + "%");
 		}
 	}
 

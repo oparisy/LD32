@@ -275,7 +275,7 @@ public class Tools {
 	 * @param width
 	 *            The width of the display required
 	 * @param height
-	 *            The height of the display required
+	 *            The height of the display required, or -1 to accept any height
 	 * @param fullscreen
 	 *            True if we want fullscreen mode
 	 */
@@ -297,7 +297,7 @@ public class Tools {
 				for (int i = 0; i < modes.length; i++) {
 					DisplayMode current = modes[i];
 
-					if ((current.getWidth() == width) && (current.getHeight() == height)) {
+					if ((current.getWidth() == width) && (height == -1 || current.getHeight() == height)) {
 						if ((targetDisplayMode == null) || (current.getFrequency() >= freq)) {
 							if ((targetDisplayMode == null) || (current.getBitsPerPixel() > targetDisplayMode.getBitsPerPixel())) {
 								targetDisplayMode = current;
@@ -324,6 +324,7 @@ public class Tools {
 				return;
 			}
 
+			System.out.println("Setting display to " + targetDisplayMode.getWidth() + "x" + targetDisplayMode.getHeight());
 			Display.setDisplayMode(targetDisplayMode);
 			Display.setFullscreen(fullscreen);
 
