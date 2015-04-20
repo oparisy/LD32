@@ -47,15 +47,16 @@ Jalon 4 : ajout de murs [fait]
 
 Jalon 5 : ajout d'ennemis (bien si static bodies) [fait] => fin de journée
 
+Bonne doc baking : https://renderedsmoothie.wordpress.com/2013/08/31/how-to-bake-textures-and-materials/
 
 Objectifs demanche :
  * Jalon 1 : détection collisions => barres de vie [fait]
  * Jalon 2 : évènements de jeu (game over, scoring) [fait]
  * Jalon 3 : affichage de ces informations [fait]
  * Poster une update [trop tard, à la release]
- * Jalon 4 : remodéliser placeholders
+ * Jalon 4 : remodéliser placeholders [fait]
  * Jalon 5 : écran titre
  * Jalon 6 : sons [fait]
  * Jalon 6 : tuning gameplay [fait]
- * Jalon 7 : tuning rendu
+ * Jalon 7 : tuning rendu [fait]
  * Jalon 8 : musique

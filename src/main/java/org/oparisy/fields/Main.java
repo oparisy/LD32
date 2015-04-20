@@ -71,7 +71,7 @@ import org.oparisy.fields.tools.common.Tools;
 
 public class Main {
 
-	private static final int BOX_NB = 5;
+	private static final int BOX_NB = 4;
 
 	private static final int WALL_BOTTOM = 5;
 
@@ -98,7 +98,7 @@ public class Main {
 	private static final float ZNEAR = 0.1f;
 	private static final float ZFAR = 100f;
 
-	boolean fullScreen = true;
+	boolean fullScreen = false;
 	private boolean vsync = true;
 
 	private static final int WINDOWED_SCREEN_WIDTH = 1024;
@@ -110,16 +110,17 @@ public class Main {
 	// Resources (shader sources) location
 	// private static final String RES = "fields"; // Main.class.getPackage().getName().replace(".", "/");
 
-	private int texture;
+	private int playerTexture;
 
 	private OpenGLMesh playerMesh;
 	private Matrix4f playerMatrix;
 
+	// Those are wrenches now
 	private OpenGLMesh boxMesh;
 	private List<Matrix4f> boxesMatrix = new ArrayList<Matrix4f>();
 
 	private Camera camera = new Camera();
-	private Vector3f lightPos = new Vector3f(4, 4, 4);
+	private Vector3f lightPos = new Vector3f(2, 2, 5);
 
 	private Matrix4f viewMatrix;
 
@@ -138,7 +139,7 @@ public class Main {
 	private ShadingProgram shadingProgram;
 	private OverlayProgram overlayProgram;
 
-	private org.oparisy.fields.tools.audio.SoundManager soundManager;
+	private SoundManager soundManager;
 
 	private int enemyKill;
 
@@ -163,6 +164,11 @@ public class Main {
 	private double score = 0;
 
 	private double elapsedSec;
+
+	private int defaultTexture;
+	private int wrenchTexture;
+
+	private OpenGLMesh wrenchMesh;
 
 	public static int uploadTexture(BufferedImage img) {
 		img = Tools.flipVertically(img);
@@ -235,10 +241,12 @@ public class Main {
 		System.out.println("GL version: " + glGetString(GL_VERSION));
 
 		// Load resources
-		BufferedImage img = ImageIO.read(Tools.loadResource("fields/uvmap.png"));
-		BufferedImage fontImg = ImageIO.read(Tools.loadResource("fields/font.png"));
+		BufferedImage img = ImageIO.read(Tools.loadResource("fields/playerMap.png"));
+		BufferedImage img2 = ImageIO.read(Tools.loadResource("fields/uvmap.png"));
+		BufferedImage img3 = ImageIO.read(Tools.loadResource("fields/wrenchMap.png"));
 
-		playerMesh = new OpenGLMesh(Tools.loadResource("fields/suzanne.obj"));
+		playerMesh = new OpenGLMesh(Tools.loadResource("fields/player.obj"));
+		wrenchMesh = new OpenGLMesh(Tools.loadResource("fields/wrench.obj"));
 		boxMesh = new OpenGLMesh(Tools.loadResource("fields/boxuv.obj"));
 		enemyMesh = new OpenGLMesh(Tools.loadResource("fields/enemy.obj"));
 
@@ -252,7 +260,10 @@ public class Main {
 		playerMesh.uploadToGPU();
 		boxMesh.uploadToGPU();
 		enemyMesh.uploadToGPU();
-		texture = uploadTexture(img);
+		wrenchMesh.uploadToGPU();
+		playerTexture = uploadTexture(img);
+		defaultTexture = uploadTexture(img2);
+		wrenchTexture = uploadTexture(img3);
 		// font = uploadTexture(fontImg);
 
 		overlayProgram = new OverlayProgram();
@@ -466,6 +477,7 @@ public class Main {
 			Matrix4f boxMatrix = new Matrix4f();
 			boxMatrix.translate(new Vector3f(physicalBox.getPosition().x, physicalBox.getPosition().y, 0));
 			boxMatrix.scale(new Vector3f(0.25f, 0.25f, 0.25f));
+			boxMatrix.rotate(physicalBox.getAngle(), new Vector3f(0,0,1));
 
 			boxesMatrix.add(boxMatrix);
 		}
@@ -503,7 +515,7 @@ public class Main {
 		shadingProgram.setViewMatrix(viewMatrix);
 
 		shadingProgram.setLightPos(lightPos);
-		shadingProgram.bindTexture(texture);
+		shadingProgram.bindTexture(playerTexture);
 
 		// Prepare program for buffers binding
 		shadingProgram.enableVertexAttribArrays();
@@ -522,12 +534,15 @@ public class Main {
 			glDisable(GL_BLEND);
 		}
 
-		// Render boxes
-		shadingProgram.bindMeshBuffers(boxMesh);
+		// Render wrenches
+		shadingProgram.bindTexture(wrenchTexture);
+		shadingProgram.bindMeshBuffers(wrenchMesh);
 		for (Matrix4f boxMatrix : boxesMatrix) {
 			shadingProgram.updateMVPMatrix(vpMatrix, boxMatrix);
-			glDrawArrays(GL_TRIANGLES, 0, boxMesh.getTriangleCount() * 3);
+			glDrawArrays(GL_TRIANGLES, 0, wrenchMesh.getTriangleCount() * 3);
 		}
+		
+		shadingProgram.bindTexture(defaultTexture);
 
 		// Render walls
 		shadingProgram.bindMeshBuffers(boxMesh);
@@ -614,7 +629,7 @@ public class Main {
 
 	private void createPhysicalBox() {
 		for (int i = 0; i < BOX_NB; i++) {
-			physicalBox.add(new Box(5 - i, 5, world, "Box#" + i));
+			physicalBox.add(new Box(5 - i*1.5f, 5, world, "Box#" + i));
 		}
 	}
 
@@ -700,7 +715,7 @@ public class Main {
 				soundManager.playEffect(this.highOuch);
 			}
 
-			dealDamage((Player) e2, force * 5f);
+			dealDamage((Player) e2, force * 6f);
 			return;
 		}
 
@@ -720,7 +735,7 @@ public class Main {
 				soundManager.playEffect(this.ouch);
 			}
 
-			dealDamage((Player) e2, force / 2f);
+			dealDamage((Player) e2, force);
 			return;
 		}
 	}

@@ -6,10 +6,10 @@ import org.jbox2d.dynamics.World;
 
 public class Box extends GameEntity {
 
-	public Box(int x, int y, World world, String name) {
+	public Box(float x, float y, World world, String name) {
 		super(name);
 		CircleShape cs = new CircleShape();
-		cs.m_radius = 0.5f;
+		cs.m_radius = 0.7f;
 		setPhysicalState(new PhysicalState(x, y, world, BodyType.DYNAMIC, cs, this));
 	}
 }
