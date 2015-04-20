@@ -276,13 +276,14 @@ public class Main {
 
 		setDisplayMode();
 		Display.setTitle(this.getClass().getSimpleName());
-
+		Display.setVSyncEnabled(vsync);
+		
 		// Set up ARB_debug_output (requires a debug context)
 		PixelFormat pixelFormat = new PixelFormat().withSamples(4); // 4x antialiasing
 		ContextAttribs contextAttributes = new ContextAttribs(3, 3).withDebug(true).withProfileCompatibility(true);
 		Display.create(pixelFormat, contextAttributes);
 		ARBDebugOutput.glDebugMessageCallbackARB(new ARBDebugOutputCallback(new MessageHandler()));
-
+		
 		System.out.println("GL version: " + glGetString(GL_VERSION));
 
 		// Load resources
@@ -425,6 +426,10 @@ public class Main {
 			if (Keyboard.isKeyDown(Keyboard.KEY_D)) {
 				x = 1;
 			}
+			
+			// Adjustements due to VSyinc
+			x *= 4f;
+			y *= 4f;
 
 			if (Keyboard.isKeyDown(Keyboard.KEY_SPACE)) {
 				attraction = true;
@@ -529,7 +534,8 @@ public class Main {
 			dir.normalize();
 
 			// Enemy speed
-			Vec2 f = dir.mul(0.7f);
+			// Adjustement required due to VSync: 0.7f -> 0.5f
+			Vec2 f = dir.mul(0.5f);
 			enemy.getState().applyForce(f, enemy.getState().getPosition());
 		}
 	}
@@ -680,6 +686,9 @@ public class Main {
 		int velocityIterations = 6;
 		int positionIterations = 2;
 
+		// Adjustment due to VSync
+		timeStep *= 4f;
+		
 		world.step(timeStep, velocityIterations, positionIterations);
 	}
 
@@ -695,6 +704,7 @@ public class Main {
 	}
 
 	private void createWalls() {
+
 		// Left
 		walls.add(new Wall(WALL_LEFT, 0, WALL_WIDTH, 6.3f, world, "Left Wall"));
 
