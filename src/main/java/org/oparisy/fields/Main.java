@@ -52,6 +52,7 @@ import org.lwjgl.opengl.ARBDebugOutput;
 import org.lwjgl.opengl.ARBDebugOutputCallback;
 import org.lwjgl.opengl.ContextAttribs;
 import org.lwjgl.opengl.Display;
+import org.lwjgl.opengl.GLContext;
 import org.lwjgl.opengl.PixelFormat;
 import org.lwjgl.util.vector.Matrix4f;
 import org.lwjgl.util.vector.Vector3f;
@@ -278,11 +279,14 @@ public class Main {
 		Display.setTitle(this.getClass().getSimpleName());
 		Display.setVSyncEnabled(vsync);
 
-		// Set up ARB_debug_output (requires a debug context)
+		// Try to set up ARB_debug_output (requires a debug context)
 		PixelFormat pixelFormat = new PixelFormat().withSamples(4); // 4x antialiasing
 		ContextAttribs contextAttributes = new ContextAttribs(3, 3).withDebug(true).withProfileCompatibility(true);
 		Display.create(pixelFormat, contextAttributes);
-		ARBDebugOutput.glDebugMessageCallbackARB(new ARBDebugOutputCallback(new MessageHandler()));
+		if (GLContext.getCapabilities().GL_ARB_debug_output) {
+			// This capability is not always available (OS X 10.10, during LD32)
+			ARBDebugOutput.glDebugMessageCallbackARB(new ARBDebugOutputCallback(new MessageHandler()));
+		}
 
 		System.out.println("GL version: " + glGetString(GL_VERSION));
 
